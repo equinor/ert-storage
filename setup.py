@@ -11,10 +11,6 @@ setup(
     license="GPLv3",
     packages=["ert_storage", "ert_storage.endpoints"],
     extras_require={
-        "python_version < '3.7": [
-            "async-exit-stack",
-            "async-generator",
-        ],
         "test": [
             "black",
             "pytest",
@@ -23,10 +19,13 @@ setup(
         ],
     },
     install_requires=[
+        "async-exit-stack; python_version < '3.7'",
+        "async-generator; python_version < '3.7'",
         "alembic",
         "fastapi",
         "psycopg2",
         "python-multipart",
+        "requests",
         "sqlalchemy",
     ],
 )
