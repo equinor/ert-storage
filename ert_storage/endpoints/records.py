@@ -1,7 +1,7 @@
 import json
 from enum import Enum
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Request, HTTPException
 from sqlalchemy.orm.exc import NoResultFound
 from ert_storage.database import Session, get_db
 from ert_storage import database_schema as ds, json_schema as js
@@ -32,11 +32,21 @@ async def list_records(*, db: Session = Depends(get_db), ensemble_id: int) -> Li
 async def get_ensemble_record(
     *, db: Session = Depends(get_db), ensemble_id: int, name: str
 ) -> Any:
-    bundle = (
-        db.query(ds.Record)
-        .filter_by(ensemble_id=ensemble_id, name=name, realization_index=None)
-        .one()
-    )
+    try:
+        bundle = (
+            db.query(ds.Record)
+            .filter_by(ensemble_id=ensemble_id, name=name, realization_index=None)
+            .one()
+        )
+    except NoResultFound:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' not found!",
+                "name": name,
+                "ensemble_id": ensemble_id,
+            },
+        )
 
     type_ = bundle.record_type
     if type_ == ds.RecordType.parameters:
@@ -67,8 +77,13 @@ async def post_ensemble_record(
         .count()
         > 0
     ):
-        raise RuntimeError(
-            f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' already exists"
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' already exists",
+                "name": name,
+                "ensemble_id": ensemble_id,
+            },
         )
 
     # Check that the ensemble exists and is valid
@@ -79,7 +94,17 @@ async def post_ensemble_record(
     if record_type is ds.RecordType.file:
         pass
     elif record_type == ds.RecordType.float_vector:
-        content = [float(x) for x in json.loads(await request.body())]
+        try:
+            content = [float(x) for x in json.loads(await request.body())]
+        except ValueError:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' needs to contain numbers only!",
+                    "name": name,
+                    "ensemble_id": ensemble_id,
+                },
+            )
     elif record_type == ds.RecordType.parameters:
         pass
 
@@ -111,11 +136,21 @@ async def get_realization_record(
             .one()
         )
     except NoResultFound:
-        bundle = (
-            db.query(ds.Record)
-            .filter_by(ensemble_id=ensemble_id, name=name, realization_index=None)
-            .one()
-        )
+        try:
+            bundle = (
+                db.query(ds.Record)
+                .filter_by(ensemble_id=ensemble_id, name=name, realization_index=None)
+                .one()
+            )
+        except NoResultFound:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' not found!",
+                    "name": name,
+                    "ensemble_id": ensemble_id,
+                },
+            )
 
     type_ = bundle.record_type
     if type_ == ds.RecordType.parameters:
