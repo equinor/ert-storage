@@ -1,7 +1,7 @@
 import json
 from enum import Enum
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, Header, Request, HTTPException
+from fastapi import APIRouter, Depends, Header, Request, HTTPException, status
 from sqlalchemy.orm.exc import NoResultFound
 from ert_storage.database import Session, get_db
 from ert_storage import database_schema as ds, json_schema as js
@@ -40,7 +40,7 @@ async def get_ensemble_record(
         )
     except NoResultFound:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "error": f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' not found!",
                 "name": name,
@@ -78,7 +78,7 @@ async def post_ensemble_record(
         > 0
     ):
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_409_CONFLICT,
             detail={
                 "error": f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' already exists",
                 "name": name,
@@ -98,7 +98,7 @@ async def post_ensemble_record(
             content = [float(x) for x in json.loads(await request.body())]
         except ValueError:
             raise HTTPException(
-                status_code=404,
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                 detail={
                     "error": f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' needs to contain numbers only!",
                     "name": name,
