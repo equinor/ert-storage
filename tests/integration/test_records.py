@@ -2,6 +2,7 @@ import os
 import pytest
 import json
 from fastapi.testclient import TestClient
+from fastapi import status
 
 
 PARAMETERS = [
@@ -56,43 +57,55 @@ def test_float_vector(client):
     ensemble_id = _create_ensemble(client)
 
     records = [
-        ("name", "[1, 2, 3, 4, 5]", True),
-        ("name", "[5, 4, 3, 2, 1]", False),
-        ("fail", "yes", False),
+        ("name", "[1, 2, 3, 4, 5]", status.HTTP_200_OK),
+        ("name", "[5, 4, 3, 2, 1]", status.HTTP_409_CONFLICT),
+        ("fail", "yes", status.HTTP_415_UNSUPPORTED_MEDIA_TYPE),
     ]
 
     # Post each of the record
-    for name, data, should_succeed in records:
-        failed = False
+    for name, data, status_code in records:
         try:
             resp = client.post(
                 f"/ensembles/{ensemble_id}/records/{name}",
                 data=data,
                 headers={"RecordType": "float_vector"},
             )
-            failed = resp.status_code != 200
-        except Exception as exc:
-            failed = True
-        if should_succeed and failed:
-            raise exc
-        elif not should_succeed and not failed:
-            raise AssertionError(
-                f"Posting '{data}' to record '{name}' was expected to fail, but it succeeded"
-            )
+        except Exception:
+            if status_code == status.HTTP_200_OK:
+                raise AssertionError(
+                    f"Posting '{data}' to record '{name}' was expected to succeed, but it failed"
+                )
+
+        assert resp.status_code == status_code
+        if status_code == status.HTTP_200_OK:
+            resp = client.get(f"/ensembles/{ensemble_id}/records/{name}")
+            assert resp.json() == json.loads(data)
+        else:
+            assert "detail" in resp.json()
+            assert resp.json()["detail"]["ensemble_id"] == ensemble_id
+            assert resp.json()["detail"]["name"] == name
+            assert resp.json()["detail"]["error"] != ""
 
     # Compare list of records
     resp = client.get(f"/ensembles/{ensemble_id}/records")
     assert resp.json() == [
-        rec[0] for rec in records if rec[2]  # name  # should_succeed
+        rec[0]
+        for rec in records
+        if rec[2] == status.HTTP_200_OK  # name  # should_succeed
     ]
 
-    # Compare getting each vector separately
-    for name, data, should_succeed in records:
-        if not should_succeed:
-            continue
-        resp = client.get(f"/ensembles/{ensemble_id}/records/{name}")
-        assert resp.status_code == 200
-        assert resp.json() == json.loads(data)
+
+def test_missing_record_exception(client):
+    ensemble_id = _create_ensemble(client)
+
+    record_name = "coeffs_typo"
+    resp = client.get(f"/ensembles/{ensemble_id}/records/{record_name}")
+    assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    assert "detail" in resp.json()
+    assert resp.json()["detail"]["ensemble_id"] == ensemble_id
+    assert resp.json()["detail"]["name"] == "coeffs_typo"
+    assert resp.json()["detail"]["error"] != ""
 
 
 def _create_ensemble(client):
