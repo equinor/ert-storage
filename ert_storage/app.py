@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import HTTPException
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import Response
+from fastapi.responses import Response, RedirectResponse
 
 from ert_storage import json_schema as js
 from ert_storage.endpoints import router
@@ -50,7 +50,7 @@ async def sqlalchemy_exception_handler(
 
 @app.get("/")
 async def root() -> dict:
-    return {}
+    return RedirectResponse("/docs")
 
 
 app.include_router(router)
