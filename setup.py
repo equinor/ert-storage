@@ -10,6 +10,9 @@ setup(
     url="https://github.com/equinor/ert-storage",
     license="GPLv3",
     packages=["ert_storage", "ert_storage.endpoints"],
+    entry_points={
+        "console_scripts": ["ert-storage=ert_storage.__main__:main"],
+    },
     extras_require={
         "test": [
             "black",

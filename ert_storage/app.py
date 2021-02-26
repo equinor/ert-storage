@@ -49,7 +49,7 @@ async def sqlalchemy_exception_handler(
 
 
 @app.get("/")
-async def root() -> dict:
+async def root() -> RedirectResponse:
     return RedirectResponse("/docs")
 
 
