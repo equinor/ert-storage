@@ -22,7 +22,15 @@ Base = declarative_base()
 
 async def get_db() -> Any:
     db = Session()
+
+    # Make PostgreSQL return float8 columns with highest precision. If we don't
+    # do this, we may lose up to 3 of the least significant digits.
+    db.execute("SET extra_float_digits=3")
     try:
         yield db
-    finally:
+        db.commit()
         db.close()
+    except:
+        db.rollback()
+        db.close()
+        raise
