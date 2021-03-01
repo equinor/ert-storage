@@ -26,6 +26,7 @@ setup(
         "async-generator; python_version < '3.7'",
         "alembic",
         "fastapi",
+        "numpy",
         "psycopg2",
         "python-multipart",
         "requests",
