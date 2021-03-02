@@ -1,4 +1,3 @@
-import json
 import numpy as np
 from urllib.parse import quote_plus
 from enum import Enum
