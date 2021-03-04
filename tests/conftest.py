@@ -3,7 +3,8 @@ import pytest
 
 
 @pytest.fixture(scope="session", autouse=True)
-def default_database():
+def default_database(tmp_path_factory):
     if "ERT_STORAGE_DATABASE_URL" not in os.environ:
-        os.environ["ERT_STORAGE_DATABASE_URL"] = "sqlite:///:memory:"
-        print("Using in-memory SQLite database for tests")
+        path = tmp_path_factory.mktemp("database")
+        os.environ["ERT_STORAGE_DATABASE_URL"] = f"sqlite:///{path / 'ert.db'}"
+        print("Using temporary SQLite database for tests")

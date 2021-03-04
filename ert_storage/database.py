@@ -1,9 +1,11 @@
 import os
 import sys
 from typing import Any
+from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from ert_storage.security import security
 
 
 STORAGE_DATABASE_URL = "ERT_STORAGE_DATABASE_URL"
@@ -28,7 +30,7 @@ Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-async def get_db() -> Any:
+async def get_db(*, _: None = Depends(security)) -> Any:
     db = Session()
 
     # Make PostgreSQL return float8 columns with highest precision. If we don't
