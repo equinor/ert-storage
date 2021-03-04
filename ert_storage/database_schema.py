@@ -15,6 +15,12 @@ class RecordType(Enum):
     file = 2
 
 
+class RecordClass(str, Enum):
+    normal = "normal"
+    response = "response"
+    parameter = "parameter"
+
+
 class Ensemble(Base):
     __tablename__ = "ensemble"
 
@@ -23,14 +29,12 @@ class Ensemble(Base):
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
-
-    parameters = sa.Column(sa.ARRAY(sa.FLOAT), nullable=False)
-    num_realizations = sa.Column(sa.Integer, nullable=False)
+    inputs = relationship("Record", foreign_keys="[Record.consumer_id]")
+    outputs = relationship("Record", foreign_keys="[Record.producer_id]")
 
 
 class Record(Base):
     __tablename__ = "record"
-    __table_args__ = (UniqueConstraint("ensemble_id", "realization_index", "name"),)
 
     def __init__(
         self, *args: Any, record_type: Optional[RecordType] = None, **kwargs: Any
@@ -48,15 +52,21 @@ class Record(Base):
     name = sa.Column(sa.String, nullable=False)
     realization_index = sa.Column(sa.Integer, nullable=True)
     _record_type = sa.Column("record_type", sa.Integer, nullable=False)
-    is_response = sa.Column(sa.Boolean, nullable=False)
+    record_class = sa.Column(sa.Enum(RecordClass), nullable=False)
 
-    ensemble_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=False)
     file_id = sa.Column(sa.Integer, sa.ForeignKey("file.id"))
     f64_matrix_id = sa.Column(sa.Integer, sa.ForeignKey("f64_matrix.id"))
 
-    ensemble = relationship("Ensemble")
     file = relationship("File")
     f64_matrix = relationship("F64Matrix")
+    consumer_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
+    consumer = relationship(
+        "Ensemble", back_populates="inputs", foreign_keys=[consumer_id]
+    )
+    producer_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
+    producer = relationship(
+        "Ensemble", back_populates="outputs", foreign_keys=[producer_id]
+    )
 
     @property
     def record_type(self) -> RecordType:
@@ -65,6 +75,17 @@ class Record(Base):
     @record_type.setter
     def record_type(self, other: RecordType) -> None:
         self._record_type = other.value
+
+    @property
+    def data(self) -> Any:
+        if self.record_type == RecordType.file:
+            return self.file.content
+        elif self.record_type == RecordType.float_vector:
+            return self.f64_matrix.content
+        else:
+            raise NotImplementedError(
+                f"The record type {self.record_type} is not yet implemented"
+            )
 
 
 class File(Base):

@@ -1,7 +1,8 @@
 import numpy as np
 from urllib.parse import quote_plus
 from enum import Enum
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, List
+import sqlalchemy as sa
 from fastapi import (
     APIRouter,
     Body,
@@ -25,8 +26,8 @@ router = APIRouter(tags=["record"])
 
 
 class ListRecords(BaseModel):
-    ensemble: Mapping[str, str]
-    forward_model: Mapping[str, str]
+    ensemble: Mapping[str, Mapping[str, str]]
+    forward_model: Mapping[str, Mapping[str, str]]
 
 
 @router.get("/ensembles/{ensemble_id}/records", response_model=ListRecords)
@@ -34,31 +35,51 @@ async def list_records(
     *, db: Session = Depends(get_db), ensemble_id: int
 ) -> ListRecords:
     types = {
-        0: "parameters",
         1: "matrix",
         2: "file",
     }
 
     return ListRecords(
-        ensemble={
-            rec.name: types[rec._record_type]
-            for rec in (
-                db.query(ds.Record)
-                .filter_by(ensemble_id=ensemble_id)
-                .filter(ds.Record.realization_index == None)
-                .all()
-            )
-        },
-        forward_model={
-            rec.name: types[rec._record_type]
-            for rec in (
-                db.query(ds.Record)
-                .filter_by(ensemble_id=ensemble_id)
-                .filter(ds.Record.realization_index != None)
-                .distinct(ds.Record.name)
-                .all()
-            )
-        },
+        ensemble=dict(
+            consuming={
+                rec.name: types[rec._record_type]
+                for rec in (
+                    db.query(ds.Record)
+                    .filter_by(consumer_id=ensemble_id)
+                    .filter(ds.Record.realization_index == None)
+                    .all()
+                )
+            },
+            producing={
+                rec.name: types[rec._record_type]
+                for rec in (
+                    db.query(ds.Record)
+                    .filter_by(producer_id=ensemble_id)
+                    .filter(ds.Record.realization_index == None)
+                    .all()
+                )
+            },
+        ),
+        forward_model=dict(
+            consuming={
+                rec.name: types[rec._record_type]
+                for rec in (
+                    db.query(ds.Record)
+                    .filter_by(consumer_id=ensemble_id)
+                    .filter(ds.Record.realization_index != None)
+                    .all()
+                )
+            },
+            producing={
+                rec.name: types[rec._record_type]
+                for rec in (
+                    db.query(ds.Record)
+                    .filter_by(producer_id=ensemble_id)
+                    .filter(ds.Record.realization_index != None)
+                    .all()
+                )
+            },
+        ),
     )
 
 
@@ -69,6 +90,7 @@ async def post_ensemble_record_file(
     ensemble_id: int,
     name: str,
     realization_index: Optional[int] = None,
+    record_class: ds.RecordClass = ds.RecordClass.normal,
     file: UploadFile = File(...),
 ) -> None:
     """
@@ -82,15 +104,18 @@ async def post_ensemble_record_file(
         mimetype=file.content_type,
     )
     db.add(file_obj)
-
     record_obj = ds.Record(
         name=name,
         record_type=ds.RecordType.file,
         realization_index=realization_index,
-        is_response=False,
-        ensemble=ensemble,
+        record_class=record_class,
         file=file_obj,
     )
+
+    if record_class == ds.RecordClass.parameter:
+        record_obj.consumer = ensemble
+    else:
+        record_obj.producer = ensemble
     db.add(record_obj)
 
 
@@ -100,8 +125,8 @@ async def post_ensemble_record_matrix(
     db: Session = Depends(get_db),
     ensemble_id: int,
     name: str,
-    realization_index: Optional[int] = Query(None),
-    is_response: bool = False,
+    realization_index: Optional[int] = None,
+    record_class: ds.RecordClass = ds.RecordClass.normal,
     body: Any = Body(...),
 ) -> None:
     """
@@ -135,33 +160,14 @@ async def post_ensemble_record_matrix(
     record_obj = ds.Record(
         name=name,
         record_type=ds.RecordType.float_vector,
-        is_response=is_response,
-        ensemble=ensemble,
+        record_class=record_class,
         f64_matrix=matrix_obj,
+        realization_index=realization_index,
     )
-    db.add(record_obj)
-
-
-@router.post("/ensembles/{ensemble_id}/records/{name}/parameters")
-async def post_ensemble_record_parameters(
-    *,
-    db: Session = Depends(get_db),
-    ensemble_id: int,
-    name: str,
-) -> None:
-    """
-    Assign the ensemble parameters to a record with the given name. This
-    endpoints takes no additional data, as the parameters were sent when setting
-    up the ensemble.
-    """
-    ensemble = _get_and_assert_ensemble(db, ensemble_id, name, None)
-
-    record_obj = ds.Record(
-        name=name,
-        record_type=ds.RecordType.parameters,
-        ensemble=ensemble,
-        is_response=False,
-    )
+    if record_class == ds.RecordClass.parameter:
+        record_obj.consumer = ensemble
+    else:
+        record_obj.producer = ensemble
     db.add(record_obj)
 
 
@@ -180,10 +186,6 @@ async def get_record(
     record.
 
     Records support multiple data formats. In particular:
-    - Parameters:
-      Will return a JSON float n-array (if `realization_index` is set) or a
-      m × n matrix, where m is the number of realizations, and n is the
-      number of parameters in each realization.
     - Matrix:
       Will return n-dimensional float matrix, where n is arbitrary.
     - File:
@@ -195,11 +197,6 @@ async def get_record(
         bundle = _get_forward_model_record(db, ensemble_id, name, realization_index)
 
     type_ = bundle.record_type
-    if type_ == ds.RecordType.parameters:
-        if realization_index is None:
-            return bundle.ensemble.parameters
-        else:
-            return bundle.ensemble.parameters[realization_index]
     if type_ == ds.RecordType.float_vector:
         return bundle.f64_matrix.content
     if type_ == ds.RecordType.file:
@@ -215,7 +212,16 @@ def _get_ensemble_record(db: Session, ensemble_id: int, name: str) -> ds.Record:
     try:
         return (
             db.query(ds.Record)
-            .filter_by(ensemble_id=ensemble_id, name=name, realization_index=None)
+            .filter(
+                sa.and_(
+                    sa.or_(
+                        ds.Record.producer_id == ensemble_id,
+                        ds.Record.consumer_id == ensemble_id,
+                    ),
+                    ds.Record.name == name,
+                    ds.Record.realization_index == None,
+                )
+            )
             .one()
         )
     except NoResultFound:
@@ -235,18 +241,16 @@ def _get_forward_model_record(
     try:
         return (
             db.query(ds.Record)
-            .filter_by(
-                ensemble_id=ensemble_id, name=name, realization_index=realization_index
+            .filter(
+                sa.and_(
+                    sa.or_(
+                        ds.Record.producer_id == ensemble_id,
+                        ds.Record.consumer_id == ensemble_id,
+                    ),
+                    ds.Record.name == name,
+                    ds.Record.realization_index == realization_index,
+                )
             )
-            .one()
-        )
-    except NoResultFound:
-        pass
-
-    try:
-        return (
-            db.query(ds.Record)
-            .filter_by(ensemble_id=ensemble_id, name=name, realization_index=None)
             .one()
         )
     except NoResultFound:
@@ -268,7 +272,7 @@ def _get_and_assert_ensemble(
     """
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
-    q = db.query(ds.Record).filter_by(ensemble_id=ensemble_id, name=name)
+    q = db.query(ds.Record).filter_by(producer_id=ensemble_id, name=name)
     if realization_index is not None:
         q = q.filter(
             (ds.Record.realization_index == None)
@@ -285,11 +289,27 @@ def _get_and_assert_ensemble(
             },
         )
 
-    if realization_index is not None and realization_index not in range(
-        ensemble.num_realizations
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "Realization index out of range"},
-        )
     return ensemble
+
+
+@router.get(
+    "/ensembles/{ensemble_id}/input_records", response_model=Mapping[str, js.RecordOut]
+)
+def get_ensemble_parameters(
+    *, db: Session = Depends(get_db), ensemble_id: int
+) -> Mapping[str, js.RecordOut]:
+    ensemble = db.query(ds.Ensemble).get(ensemble_id)
+    return {rec.name: rec for rec in ensemble.inputs}
+
+
+@router.get(
+    "/ensembles/{ensemble_id}/output_records", response_model=Mapping[str, js.RecordOut]
+)
+def get_ensemble_records(
+    *, db: Session = Depends(get_db), ensemble_id: int
+) -> Mapping[str, js.RecordOut]:
+    ensemble = db.query(ds.Ensemble).get(ensemble_id)
+    return {
+        rec.name: js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
+        for rec in ensemble.outputs
+    }

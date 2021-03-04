@@ -62,7 +62,8 @@ def client():
     app.dependency_overrides[get_db] = override_get_db
     yield _TestClient(app)
 
-    # teardown: rollback database to before the test
+    # teardown: rollback database to before the test.
+    # For debugging change rollback to commit.
     transaction.rollback()
     connection.close()
 
@@ -72,37 +73,60 @@ def test_list(client):
 
     resp = client.get(f"/ensembles/{ensemble_id}/records")
     assert resp.json() == {
-        "ensemble": {},
-        "forward_model": {},
+        "ensemble": {"consuming": {}, "producing": {}},
+        "forward_model": {"consuming": {}, "producing": {}},
     }
 
     client.post_check(f"/ensembles/{ensemble_id}/records/hello/matrix", data="[]")
     client.post_check(
-        f"/ensembles/{ensemble_id}/records/foo/file?realization_index=1",
+        f"/ensembles/{ensemble_id}/records/foo/file",
+        params=dict(realization_index=1),
         files={"file": ("foo.bar", io.BytesIO(), "foo/bar")},
     )
-    client.post_check(f"/ensembles/{ensemble_id}/records/world/parameters")
+    client.post_check(
+        f"/ensembles/{ensemble_id}/records/world/matrix",
+        params=dict(record_class="parameter"),
+        data="[]",
+    )
 
     resp = client.get_check(f"/ensembles/{ensemble_id}/records")
     assert resp.json() == {
-        "ensemble": {"hello": "matrix", "world": "parameters"},
-        "forward_model": {"foo": "file"},
+        "ensemble": {
+            "producing": {"hello": "matrix"},
+            "consuming": {"world": "matrix"},
+        },
+        "forward_model": {"producing": {"foo": "file"}, "consuming": {}},
     }
 
 
 def test_parameters(client):
     ensemble_id = _create_ensemble(client)
-    client.post(f"/ensembles/{ensemble_id}/records/coeffs/parameters")
+    client.post(
+        f"/ensembles/{ensemble_id}/records/coeffs/matrix",
+        params=dict(record_class="parameter"),
+        data=f"{PARAMETERS}",
+    )
 
     resp = client.get_check(f"/ensembles/{ensemble_id}/records")
-    assert resp.json() == {"ensemble": {"coeffs": "parameters"}, "forward_model": {}}
+    assert resp.json() == {
+        "ensemble": {"consuming": {"coeffs": "matrix"}, "producing": {}},
+        "forward_model": {"producing": {}, "consuming": {}},
+    }
 
     resp = client.get_check(f"/ensembles/{ensemble_id}/records/coeffs")
     assert resp.json() == PARAMETERS
 
     for realization_index in range(NUM_REALIZATIONS):
+        client.post_check(
+            f"/ensembles/{ensemble_id}/records/indexed_coeffs/matrix",
+            params=dict(record_class="parameter", realization_index=realization_index),
+            data=f"{PARAMETERS[realization_index]}",
+        )
+
+    for realization_index in range(NUM_REALIZATIONS):
         resp = client.get_check(
-            f"/ensembles/{ensemble_id}/records/coeffs?realization_index={realization_index}"
+            f"/ensembles/{ensemble_id}/records/indexed_coeffs",
+            params=dict(realization_index=realization_index),
         )
         assert resp.json() == PARAMETERS[realization_index]
 
@@ -145,7 +169,7 @@ def test_matrix(client):
 
     # Compare list of records
     resp = client.get(f"/ensembles/{ensemble_id}/records")
-    ensemble_records = set(resp.json()["ensemble"])
+    ensemble_records = set(resp.json()["ensemble"]["producing"])
     assert ensemble_records == {
         rec[0]
         for rec in records
