@@ -4,7 +4,6 @@ from typing import Any, Optional
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from sqlalchemy.schema import UniqueConstraint
 
 from ert_storage.database import Base, IS_POSTGRES
 

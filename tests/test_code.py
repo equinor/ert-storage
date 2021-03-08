@@ -1,6 +1,6 @@
 import os
 import sys
-from subprocess import run, PIPE
+from subprocess import run
 
 
 def test_formatting():
@@ -12,8 +12,6 @@ def test_formatting():
             "--check",
             os.path.join(os.path.dirname(__file__), ".."),
         ],
-        stdout=sys.stdout,
-        stderr=sys.stderr,
     )
 
     if proc.returncode != 0:
@@ -31,8 +29,6 @@ def test_typing():
             "--disallow-untyped-defs",
             "--show-error-codes",
         ],
-        stdout=sys.stdout,
-        stderr=sys.stderr,
     )
 
     if proc.returncode != 0:

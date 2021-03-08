@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends
-from typing import List
 from ert_storage.database import Session, get_db
 from ert_storage import database_schema as ds, json_schema as js
 

@@ -1,13 +1,8 @@
-import os
-import sys
 import json
 from typing import Any
 from fastapi import FastAPI, Request, status
-from fastapi.exceptions import HTTPException
-from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import Response, RedirectResponse
 
-from ert_storage import json_schema as js
 from ert_storage.endpoints import router
 
 from sqlalchemy.orm.exc import NoResultFound
