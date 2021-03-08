@@ -20,6 +20,9 @@ setup(
             "mypy",
             "uvicorn",
         ],
+        "postgres": [
+            "psycopg2",
+        ],
     },
     install_requires=[
         "alembic",
@@ -27,7 +30,6 @@ setup(
         "async-generator; python_version < '3.7'",
         "fastapi",
         "numpy",
-        "psycopg2",
         "pydantic",
         "python-multipart",
         "requests",

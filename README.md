@@ -37,7 +37,7 @@ compile `psycopg2`, which is the PostgreSQL driver (hence the requirement for
 `postgresql-devel`).
 
 ``` sh
-pip install -e .[test]
+pip install -e .[test,postgres]
 ```
 
 Then, using Alembic, update the database schema.

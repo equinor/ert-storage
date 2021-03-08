@@ -1,4 +1,4 @@
-name: Storage CI
+name: PostgreSQL Storage CI
 
 on:
   push:
@@ -10,6 +10,13 @@ on:
 
 jobs:
   build:
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.6, 3.9]
+
     runs-on: ubuntu-latest
 
     services:
@@ -28,12 +35,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/setup-python@v2
+      - name: Set up Python ${{ matrix.python-version  }}
+        uses: actions/setup-python@v2
         with:
-          python-version: '3.6'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install
-        run: pip install -e .[test]
+        run: pip install -e .[test,postgres]
 
       - name: Run tests
         run: |

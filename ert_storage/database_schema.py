@@ -6,7 +6,13 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.schema import UniqueConstraint
 
-from ert_storage.database import Base
+from ert_storage.database import Base, IS_POSTGRES
+
+
+if IS_POSTGRES:
+    FloatArray = sa.ARRAY(sa.FLOAT)
+else:
+    FloatArray = sa.PickleType
 
 
 class RecordType(Enum):
@@ -112,4 +118,4 @@ class F64Matrix(Base):
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
 
-    content = sa.Column(sa.ARRAY(sa.FLOAT), nullable=False)
+    content = sa.Column(FloatArray, nullable=False)
