@@ -38,7 +38,11 @@ class _TestClient(TestClient):
 @pytest.fixture
 def client():
     from ert_storage.app import app
-    from ert_storage.database import get_db, engine
+    from ert_storage.database import get_db, engine, IS_SQLITE, IS_POSTGRES
+    from ert_storage.database_schema import Base
+
+    if IS_SQLITE:
+        Base.metadata.create_all(bind=engine)
 
     connection = engine.connect()
     transaction = connection.begin()
@@ -49,7 +53,8 @@ def client():
 
         # Make PostgreSQL return float8 columns with highest precision. If we don't
         # do this, we may lose up to 3 of the least significant digits.
-        db.execute("SET extra_float_digits=3")
+        if IS_POSTGRES:
+            db.execute("SET extra_float_digits=3")
         try:
             yield db
             db.commit()

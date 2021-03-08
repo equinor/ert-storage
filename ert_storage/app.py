@@ -36,6 +36,16 @@ app = FastAPI(
 )
 
 
+@app.on_event("startup")
+async def initialize_database() -> None:
+    from ert_storage.database import engine, IS_SQLITE
+    from ert_storage.database_schema import Base
+
+    if IS_SQLITE:
+        # Our SQLite backend doesn't support migrations, so create the database on the fly.
+        Base.metadata.create_all(bind=engine)
+
+
 @app.exception_handler(NoResultFound)
 async def sqlalchemy_exception_handler(
     request: Request, exc: NoResultFound
