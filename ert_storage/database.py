@@ -10,7 +10,7 @@ STORAGE_DATABASE_URL = "ERT_STORAGE_DATABASE_URL"
 
 
 if STORAGE_DATABASE_URL not in os.environ:
-    sys.exit(f"{STORAGE_DATABASE_URL}")
+    sys.exit(f"Environment variable '{STORAGE_DATABASE_URL}' not set")
 
 
 IS_SQLITE = os.environ[STORAGE_DATABASE_URL].startswith("sqlite")

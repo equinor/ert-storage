@@ -9,7 +9,18 @@ setup(
     author_email="fg_sib-scout@equinor.com",
     url="https://github.com/equinor/ert-storage",
     license="GPLv3",
-    packages=["ert_storage", "ert_storage.endpoints"],
+    packages=[
+        "ert_storage",
+        "ert_storage._alembic",
+        "ert_storage._alembic.alembic",
+        "ert_storage._alembic.alembic.versions",
+        "ert_storage.endpoints",
+    ],
+    package_data={
+        "ert_storage._alembic": [
+            "alembic.ini",
+        ]
+    },
     entry_points={
         "console_scripts": ["ert-storage=ert_storage.__main__:main"],
     },
