@@ -76,10 +76,7 @@ def test_list(client):
     ensemble_id = _create_ensemble(client)
 
     resp = client.get(f"/ensembles/{ensemble_id}/records")
-    assert resp.json() == {
-        "ensemble": {"consuming": {}, "producing": {}},
-        "forward_model": {"consuming": {}, "producing": {}},
-    }
+    assert resp.json() == {}
 
     client.post_check(f"/ensembles/{ensemble_id}/records/hello/matrix", data="[]")
     client.post_check(
@@ -89,33 +86,22 @@ def test_list(client):
     )
     client.post_check(
         f"/ensembles/{ensemble_id}/records/world/matrix",
-        params=dict(record_class="parameter"),
         data="[]",
     )
 
     resp = client.get_check(f"/ensembles/{ensemble_id}/records")
-    assert resp.json() == {
-        "ensemble": {
-            "producing": {"hello": "matrix"},
-            "consuming": {"world": "matrix"},
-        },
-        "forward_model": {"producing": {"foo": "file"}, "consuming": {}},
-    }
+    assert set(resp.json().keys()) == {"hello", "world", "foo"}
 
 
 def test_parameters(client):
-    ensemble_id = _create_ensemble(client)
+    ensemble_id = _create_ensemble(client, ["coeffs"])
     client.post(
         f"/ensembles/{ensemble_id}/records/coeffs/matrix",
-        params=dict(record_class="parameter"),
         data=f"{PARAMETERS}",
     )
 
-    resp = client.get_check(f"/ensembles/{ensemble_id}/records")
-    assert resp.json() == {
-        "ensemble": {"consuming": {"coeffs": "matrix"}, "producing": {}},
-        "forward_model": {"producing": {}, "consuming": {}},
-    }
+    resp = client.get_check(f"/ensembles/{ensemble_id}/parameters")
+    assert resp.json() == ["coeffs"]
 
     resp = client.get_check(f"/ensembles/{ensemble_id}/records/coeffs")
     assert resp.json() == PARAMETERS
@@ -123,7 +109,7 @@ def test_parameters(client):
     for realization_index in range(NUM_REALIZATIONS):
         client.post_check(
             f"/ensembles/{ensemble_id}/records/indexed_coeffs/matrix",
-            params=dict(record_class="parameter", realization_index=realization_index),
+            params=dict(realization_index=realization_index),
             data=f"{PARAMETERS[realization_index]}",
         )
 
@@ -173,7 +159,7 @@ def test_matrix(client):
 
     # Compare list of records
     resp = client.get(f"/ensembles/{ensemble_id}/records")
-    ensemble_records = set(resp.json()["ensemble"]["producing"])
+    ensemble_records = set(resp.json().keys())
     assert ensemble_records == {
         rec[0]
         for rec in records
@@ -254,6 +240,6 @@ def test_forward_model_file(client):
             assert resp.status_code == 404
 
 
-def _create_ensemble(client):
-    resp = client.post("/ensembles", json={"parameters": PARAMETERS})
+def _create_ensemble(client, parameters=[]):
+    resp = client.post("/ensembles", json={"parameters": parameters})
     return resp.json()["id"]

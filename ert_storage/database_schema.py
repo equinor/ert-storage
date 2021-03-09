@@ -10,20 +10,17 @@ from ert_storage.database import Base, IS_POSTGRES
 
 if IS_POSTGRES:
     FloatArray = sa.ARRAY(sa.FLOAT)
+    StringArray = sa.ARRAY(sa.String)
+
 else:
     FloatArray = sa.PickleType
+    StringArray = sa.PickleType
 
 
 class RecordType(Enum):
     parameters = 0
     float_vector = 1
     file = 2
-
-
-class RecordClass(str, Enum):
-    normal = "normal"
-    response = "response"
-    parameter = "parameter"
 
 
 class Ensemble(Base):
@@ -34,8 +31,8 @@ class Ensemble(Base):
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
-    inputs = relationship("Record", foreign_keys="[Record.consumer_id]")
-    outputs = relationship("Record", foreign_keys="[Record.producer_id]")
+    inputs = sa.Column(StringArray)
+    records = relationship("Record", foreign_keys="[Record.ensemble_id]")
 
 
 class Record(Base):
@@ -57,21 +54,14 @@ class Record(Base):
     name = sa.Column(sa.String, nullable=False)
     realization_index = sa.Column(sa.Integer, nullable=True)
     _record_type = sa.Column("record_type", sa.Integer, nullable=False)
-    record_class = sa.Column(sa.Enum(RecordClass), nullable=False)
 
     file_id = sa.Column(sa.Integer, sa.ForeignKey("file.id"))
     f64_matrix_id = sa.Column(sa.Integer, sa.ForeignKey("f64_matrix.id"))
 
     file = relationship("File")
     f64_matrix = relationship("F64Matrix")
-    consumer_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
-    consumer = relationship(
-        "Ensemble", back_populates="inputs", foreign_keys=[consumer_id]
-    )
-    producer_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
-    producer = relationship(
-        "Ensemble", back_populates="outputs", foreign_keys=[producer_id]
-    )
+    ensemble_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
+    ensemble = relationship("Ensemble", back_populates="records")
 
     @property
     def record_type(self) -> RecordType:
