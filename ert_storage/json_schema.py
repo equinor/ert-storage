@@ -8,7 +8,6 @@ class _Ensemble(BaseModel):
 
 class EnsembleIn(_Ensemble):
     parameters: List[str]
-    ensemble_id: Optional[int]
 
 
 class EnsembleOut(_Ensemble):

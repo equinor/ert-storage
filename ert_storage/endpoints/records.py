@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, List
 import sqlalchemy as sa
 from fastapi import (
     APIRouter,
@@ -21,61 +21,8 @@ router = APIRouter(tags=["record"])
 
 
 class ListRecords(BaseModel):
-    ensemble: Mapping[str, Mapping[str, str]]
-    forward_model: Mapping[str, Mapping[str, str]]
-
-
-@router.get("/ensembles/{ensemble_id}/records", response_model=ListRecords)
-async def list_records(
-    *, db: Session = Depends(get_db), ensemble_id: int
-) -> ListRecords:
-    types = {
-        1: "matrix",
-        2: "file",
-    }
-
-    return ListRecords(
-        ensemble=dict(
-            consuming={
-                rec.name: types[rec._record_type]
-                for rec in (
-                    db.query(ds.Record)
-                    .filter_by(consumer_id=ensemble_id)
-                    .filter(ds.Record.realization_index == None)
-                    .all()
-                )
-            },
-            producing={
-                rec.name: types[rec._record_type]
-                for rec in (
-                    db.query(ds.Record)
-                    .filter_by(producer_id=ensemble_id)
-                    .filter(ds.Record.realization_index == None)
-                    .all()
-                )
-            },
-        ),
-        forward_model=dict(
-            consuming={
-                rec.name: types[rec._record_type]
-                for rec in (
-                    db.query(ds.Record)
-                    .filter_by(consumer_id=ensemble_id)
-                    .filter(ds.Record.realization_index != None)
-                    .all()
-                )
-            },
-            producing={
-                rec.name: types[rec._record_type]
-                for rec in (
-                    db.query(ds.Record)
-                    .filter_by(producer_id=ensemble_id)
-                    .filter(ds.Record.realization_index != None)
-                    .all()
-                )
-            },
-        ),
-    )
+    ensemble: Mapping[str, str]
+    forward_model: Mapping[str, str]
 
 
 @router.post("/ensembles/{ensemble_id}/records/{name}/file")
@@ -85,7 +32,6 @@ async def post_ensemble_record_file(
     ensemble_id: int,
     name: str,
     realization_index: Optional[int] = None,
-    record_class: ds.RecordClass = ds.RecordClass.normal,
     file: UploadFile = File(...),
 ) -> None:
     """
@@ -103,14 +49,10 @@ async def post_ensemble_record_file(
         name=name,
         record_type=ds.RecordType.file,
         realization_index=realization_index,
-        record_class=record_class,
         file=file_obj,
     )
 
-    if record_class == ds.RecordClass.parameter:
-        record_obj.consumer = ensemble
-    else:
-        record_obj.producer = ensemble
+    record_obj.ensemble = ensemble
     db.add(record_obj)
 
 
@@ -121,7 +63,6 @@ async def post_ensemble_record_matrix(
     ensemble_id: int,
     name: str,
     realization_index: Optional[int] = None,
-    record_class: ds.RecordClass = ds.RecordClass.normal,
     body: Any = Body(...),
 ) -> None:
     """
@@ -155,14 +96,10 @@ async def post_ensemble_record_matrix(
     record_obj = ds.Record(
         name=name,
         record_type=ds.RecordType.float_vector,
-        record_class=record_class,
         f64_matrix=matrix_obj,
         realization_index=realization_index,
     )
-    if record_class == ds.RecordClass.parameter:
-        record_obj.consumer = ensemble
-    else:
-        record_obj.producer = ensemble
+    record_obj.ensemble = ensemble
     db.add(record_obj)
 
 
@@ -209,10 +146,7 @@ def _get_ensemble_record(db: Session, ensemble_id: int, name: str) -> ds.Record:
             db.query(ds.Record)
             .filter(
                 sa.and_(
-                    sa.or_(
-                        ds.Record.producer_id == ensemble_id,
-                        ds.Record.consumer_id == ensemble_id,
-                    ),
+                    ds.Record.ensemble_id == ensemble_id,
                     ds.Record.name == name,
                     ds.Record.realization_index == None,
                 )
@@ -238,10 +172,7 @@ def _get_forward_model_record(
             db.query(ds.Record)
             .filter(
                 sa.and_(
-                    sa.or_(
-                        ds.Record.producer_id == ensemble_id,
-                        ds.Record.consumer_id == ensemble_id,
-                    ),
+                    ds.Record.ensemble_id == ensemble_id,
                     ds.Record.name == name,
                     ds.Record.realization_index == realization_index,
                 )
@@ -267,7 +198,7 @@ def _get_and_assert_ensemble(
     """
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
-    q = db.query(ds.Record).filter_by(producer_id=ensemble_id, name=name)
+    q = db.query(ds.Record).filter_by(ensemble_id=ensemble_id, name=name)
     if realization_index is not None:
         q = q.filter(
             (ds.Record.realization_index == None)
@@ -287,18 +218,16 @@ def _get_and_assert_ensemble(
     return ensemble
 
 
-@router.get(
-    "/ensembles/{ensemble_id}/input_records", response_model=Mapping[str, js.RecordOut]
-)
+@router.get("/ensembles/{ensemble_id}/parameters", response_model=List[str])
 def get_ensemble_parameters(
     *, db: Session = Depends(get_db), ensemble_id: int
-) -> Mapping[str, js.RecordOut]:
+) -> List[str]:
     ensemble = db.query(ds.Ensemble).get(ensemble_id)
-    return {rec.name: rec for rec in ensemble.inputs}
+    return ensemble.inputs
 
 
 @router.get(
-    "/ensembles/{ensemble_id}/output_records", response_model=Mapping[str, js.RecordOut]
+    "/ensembles/{ensemble_id}/records", response_model=Mapping[str, js.RecordOut]
 )
 def get_ensemble_records(
     *, db: Session = Depends(get_db), ensemble_id: int
@@ -306,5 +235,5 @@ def get_ensemble_records(
     ensemble = db.query(ds.Ensemble).get(ensemble_id)
     return {
         rec.name: js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
-        for rec in ensemble.outputs
+        for rec in ensemble.records
     }
