@@ -29,7 +29,6 @@ setup(
             "black",
             "pytest",
             "mypy",
-            "uvicorn",
         ],
         "postgres": [
             "psycopg2",
@@ -45,5 +44,6 @@ setup(
         "python-multipart",
         "requests",
         "sqlalchemy",
+        "uvicorn",
     ],
 )
