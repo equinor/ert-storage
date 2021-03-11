@@ -1,3 +1,4 @@
+import uuid
 import numpy as np
 from typing import Any, Mapping, Optional, List
 import sqlalchemy as sa
@@ -7,14 +8,18 @@ from fastapi import (
     Depends,
     File,
     HTTPException,
-    Response,
     UploadFile,
     status,
 )
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm.exc import NoResultFound
-from ert_storage.database import Session, get_db
+from ert_storage.database import Session, get_db, HAS_AZURE_BLOB_STORAGE, BLOB_CONTAINER
 from ert_storage import database_schema as ds, json_schema as js
+
+
+if HAS_AZURE_BLOB_STORAGE:
+    from ert_storage.database import azure_blob_container
 
 
 router = APIRouter(tags=["record"])
@@ -40,10 +45,19 @@ async def post_ensemble_record_file(
     ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
 
     file_obj = ds.File(
-        content=await file.read(),
         filename=file.filename,
         mimetype=file.content_type,
     )
+    if HAS_AZURE_BLOB_STORAGE:
+        key = f"{name}@{realization_index}@{uuid.uuid4()}"
+        blob = azure_blob_container.get_blob_client(key)
+        blob.upload_blob(file.file)
+
+        file_obj.az_container = azure_blob_container.container_name
+        file_obj.az_blob = key
+    else:
+        file_obj.content = await file.read()
+
     db.add(file_obj)
     record_obj = ds.Record(
         name=name,
@@ -133,11 +147,19 @@ async def get_record(
         return bundle.f64_matrix.content
     if type_ == ds.RecordType.file:
         f = bundle.file
-        return Response(
-            content=f.content,
-            media_type=f.mimetype,
-            headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
-        )
+        if f.content is not None:
+            return Response(
+                content=f.content,
+                media_type=f.mimetype,
+                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
+            )
+        elif f.az_container is not None and f.az_blob is not None:
+            blob = azure_blob_container.get_blob_client(f.az_blob)
+            return StreamingResponse(
+                blob.download_blob().chunks(),
+                media_type=f.mimetype,
+                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
+            )
 
 
 def _get_ensemble_record(db: Session, ensemble_id: int, name: str) -> ds.Record:

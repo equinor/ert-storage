@@ -6,22 +6,25 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 
-STORAGE_DATABASE_URL = "ERT_STORAGE_DATABASE_URL"
+ENV_RDBMS = "ERT_STORAGE_DATABASE_URL"
+ENV_BLOB = "ERT_STORAGE_AZURE_CONNECTION_STRING"
+ENV_BLOB_CONTAINER = "ERT_STORAGE_AZURE_BLOB_CONTAINER"
+
+if ENV_RDBMS not in os.environ:
+    sys.exit(f"Environment variable '{ENV_RDBMS}' not set")
 
 
-if STORAGE_DATABASE_URL not in os.environ:
-    sys.exit(f"Environment variable '{STORAGE_DATABASE_URL}' not set")
+URI_RDBMS = os.environ[ENV_RDBMS]
+IS_SQLITE = URI_RDBMS.startswith("sqlite")
+IS_POSTGRES = URI_RDBMS.startswith("postgres")
+HAS_AZURE_BLOB_STORAGE = ENV_BLOB in os.environ
+BLOB_CONTAINER = os.getenv(ENV_BLOB_CONTAINER, "ert")
 
-
-IS_SQLITE = os.environ[STORAGE_DATABASE_URL].startswith("sqlite")
-IS_POSTGRES = os.environ[STORAGE_DATABASE_URL].startswith("postgres")
 
 if IS_SQLITE:
-    engine = create_engine(
-        os.environ[STORAGE_DATABASE_URL], connect_args={"check_same_thread": False}
-    )
+    engine = create_engine(URI_RDBMS, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(os.environ[STORAGE_DATABASE_URL])
+    engine = create_engine(URI_RDBMS)
 Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -43,3 +46,18 @@ async def get_db() -> Any:
         db.rollback()
         db.close()
         raise
+
+
+if HAS_AZURE_BLOB_STORAGE:
+    from azure.core.exceptions import ResourceNotFoundError
+    from azure.storage.blob import ContainerClient
+
+    azure_blob_container = ContainerClient.from_connection_string(
+        os.environ[ENV_BLOB], BLOB_CONTAINER
+    )
+
+    try:
+        azure_blob_container.get_container_properties()
+    except ResourceNotFoundError:
+        azure_blob_container.create_container()
+        azure_blob_container.get_container_properties()

@@ -25,6 +25,12 @@ def run_server() -> None:
         database_dir = mkdtemp(prefix="ert-storage_")
         os.environ["ERT_STORAGE_DATABASE_URL"] = f"sqlite:///{database_dir}/ert.db"
 
+    if "ERT_STORAGE_AZURE_CONNECTION_STRING" not in os.environ:
+        print(
+            "Environment variable 'ERT_STORAGE_AZURE_CONNECTION_STRING' not set.\n"
+            "Not using Azure Blob Storage. Blob data will be stored in the RDBMS.\n"
+        )
+
     try:
         uvicorn.run(
             "ert_storage.app:app", reload=True, reload_dirs=[os.path.dirname(__file__)]
