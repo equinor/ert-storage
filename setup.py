@@ -38,6 +38,7 @@ setup(
         "alembic",
         "async-exit-stack; python_version < '3.7'",
         "async-generator; python_version < '3.7'",
+        "azure-storage-blob",
         "fastapi",
         "numpy",
         "pydantic",
