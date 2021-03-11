@@ -58,4 +58,9 @@ async def root() -> RedirectResponse:
     return RedirectResponse("/docs")
 
 
+@app.get("/healthcheck")
+async def healthcheck() -> str:
+    return "ALL OK!"
+
+
 app.include_router(router)
