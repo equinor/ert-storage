@@ -3,7 +3,6 @@ from setuptools import setup
 
 setup(
     name="ert-storage",
-    version="0.1.0",
     description="Storage service for ERT",
     author="Equinor ASA",
     author_email="fg_sib-scout@equinor.com",
