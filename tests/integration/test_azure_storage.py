@@ -23,8 +23,8 @@ def azure_client():
     yield ContainerClient.from_connection_string(os.environ[ENV_BLOB], BLOB_CONTAINER)
 
 
-def test_blob(client, azure_client):
-    ensemble_id = _create_ensemble(client)
+def test_blob(client, azure_client, simple_ensemble):
+    ensemble_id = simple_ensemble()
 
     # List all blobs prior to adding file
     pre_blobs = {blob.name for blob in azure_client.list_blobs()}
@@ -47,9 +47,9 @@ def test_blob(client, azure_client):
     assert blob.download_blob().readall() == resp.content
 
 
-def test_blocked_blob(client, azure_client):
+def test_blocked_blob(client, azure_client, simple_ensemble):
 
-    ensemble_id = _create_ensemble(client)
+    ensemble_id = simple_ensemble()
 
     size = 12 * 1024 ** 2
     block_size = 4 * 1024 ** 2
@@ -81,8 +81,3 @@ def test_blocked_blob(client, azure_client):
     )
 
     assert b"".join(chunks) == resp.content
-
-
-def _create_ensemble(client, parameters=[]):
-    resp = client.post("/ensembles", json={"parameters": parameters})
-    return resp.json()["id"]

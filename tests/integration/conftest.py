@@ -81,3 +81,35 @@ def client():
     # For debugging change rollback to commit.
     transaction.rollback()
     connection.close()
+
+
+@pytest.fixture
+def create_ensemble(client):
+    def func(experiment_id, parameters=None):
+        if parameters is None:
+            parameters = []
+        resp = client.post_check(
+            f"/experiments/{experiment_id}/ensembles", json={"parameters": parameters}
+        )
+        return resp.json()["id"]
+
+    return func
+
+
+@pytest.fixture
+def create_experiment(client):
+    def func(name):
+        resp = client.post_check("/experiments", json={"name": name})
+        return resp.json()["id"]
+
+    return func
+
+
+@pytest.fixture
+def simple_ensemble(create_ensemble, create_experiment, request):
+    def func(parameters=None):
+        exp_id = create_experiment(request.node.name)
+        ens_id = create_ensemble(exp_id, parameters=parameters)
+        return ens_id
+
+    return func

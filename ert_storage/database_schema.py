@@ -33,6 +33,22 @@ class Ensemble(Base):
     )
     inputs = sa.Column(StringArray)
     records = relationship("Record", foreign_keys="[Record.ensemble_id]")
+    experiment_id = sa.Column(
+        sa.Integer, sa.ForeignKey("experiment.id"), nullable=False
+    )
+    experiment = relationship("Experiment", back_populates="ensembles")
+
+
+class Experiment(Base):
+    __tablename__ = "experiment"
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    time_created = sa.Column(sa.DateTime, server_default=func.now())
+    time_updated = sa.Column(
+        sa.DateTime, server_default=func.now(), onupdate=func.now()
+    )
+    name = sa.Column(sa.String)
+    ensembles = relationship("Ensemble", foreign_keys="[Ensemble.experiment_id]")
 
 
 class Record(Base):
