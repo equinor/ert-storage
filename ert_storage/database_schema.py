@@ -95,7 +95,7 @@ class File(Base):
     filename = sa.Column(sa.String, nullable=False)
     mimetype = sa.Column(sa.String, nullable=False)
 
-    content = sa.Column(sa.Binary)
+    content = sa.Column(sa.LargeBinary)
     az_container = sa.Column(sa.String)
     az_blob = sa.Column(sa.String)
 
