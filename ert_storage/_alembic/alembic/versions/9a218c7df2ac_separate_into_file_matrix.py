@@ -53,7 +53,7 @@ def upgrade():
         ),
         sa.Column("filename", sa.String(), nullable=False),
         sa.Column("mimetype", sa.String(), nullable=False),
-        sa.Column("content", sa.Binary(), nullable=False),
+        sa.Column("content", sa.LargeBinary(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.add_column("record", sa.Column("f64_matrix_id", sa.Integer(), nullable=True))
