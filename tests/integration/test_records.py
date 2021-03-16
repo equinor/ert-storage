@@ -1,5 +1,4 @@
 import io
-import pytest
 import json
 import random
 import numpy as np
@@ -16,8 +15,8 @@ PARAMETERS = [
 ]
 
 
-def test_list(client):
-    ensemble_id = _create_ensemble(client)
+def test_list(client, simple_ensemble):
+    ensemble_id = simple_ensemble()
 
     resp = client.get(f"/ensembles/{ensemble_id}/records")
     assert resp.json() == {}
@@ -37,8 +36,8 @@ def test_list(client):
     assert set(resp.json().keys()) == {"hello", "world", "foo"}
 
 
-def test_parameters(client):
-    ensemble_id = _create_ensemble(client, ["coeffs"])
+def test_parameters(client, simple_ensemble):
+    ensemble_id = simple_ensemble(["coeffs"])
     client.post(
         f"/ensembles/{ensemble_id}/records/coeffs/matrix",
         data=f"{PARAMETERS}",
@@ -65,8 +64,8 @@ def test_parameters(client):
         assert resp.json() == PARAMETERS[realization_index]
 
 
-def test_matrix(client):
-    ensemble_id = _create_ensemble(client)
+def test_matrix(client, simple_ensemble):
+    ensemble_id = simple_ensemble()
 
     records = [
         ("name", "[1, 2, 3, 4, 5]", status.HTTP_200_OK),
@@ -111,8 +110,8 @@ def test_matrix(client):
     }
 
 
-def test_missing_record_exception(client):
-    ensemble_id = _create_ensemble(client)
+def test_missing_record_exception(client, simple_ensemble):
+    ensemble_id = simple_ensemble()
 
     record_name = "coeffs_typo"
     resp = client.get(f"/ensembles/{ensemble_id}/records/{record_name}")
@@ -124,8 +123,8 @@ def test_missing_record_exception(client):
     assert resp.json()["detail"]["error"] != ""
 
 
-def test_ensemble_matrix(client):
-    ensemble_id = _create_ensemble(client)
+def test_ensemble_matrix(client, simple_ensemble):
+    ensemble_id = simple_ensemble()
 
     matrix = np.random.rand(5, 8, 13)
 
@@ -137,8 +136,8 @@ def test_ensemble_matrix(client):
     assert resp.json() == matrix.tolist()
 
 
-def test_ensemble_file(client):
-    ensemble_id = _create_ensemble(client)
+def test_ensemble_file(client, simple_ensemble):
+    ensemble_id = simple_ensemble()
 
     with open("/dev/urandom", "rb") as f:
         data = f.read(random.randint(2 ** 16, 2 ** 24))
@@ -151,8 +150,8 @@ def test_ensemble_file(client):
     assert resp.content == data
 
 
-def test_forward_model_file(client):
-    ensemble_id = _create_ensemble(client)
+def test_forward_model_file(client, simple_ensemble):
+    ensemble_id = simple_ensemble()
 
     with open("/dev/urandom", "rb") as f:
         data_a = f.read(random.randint(2 ** 16, 2 ** 24))
@@ -184,9 +183,9 @@ def test_forward_model_file(client):
             assert resp.status_code == 404
 
 
-def test_blocked_blob(client):
+def test_blocked_blob(client, simple_ensemble):
 
-    ensemble_id = _create_ensemble(client)
+    ensemble_id = simple_ensemble()
 
     size = 12 * 1024 ** 2
     block_size = 4 * 1024 ** 2
@@ -216,10 +215,4 @@ def test_blocked_blob(client):
     resp = client.get_check(
         f"/ensembles/{ensemble_id}/records/foo",
     )
-    print(resp.content)
     assert b"".join(chunks) == resp.content
-
-
-def _create_ensemble(client, parameters=[]):
-    resp = client.post("/ensembles", json={"parameters": parameters})
-    return resp.json()["id"]

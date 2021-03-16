@@ -17,6 +17,22 @@ class EnsembleOut(_Ensemble):
         orm_mode = True
 
 
+class _Experiment(BaseModel):
+    name: str
+
+
+class ExperimentIn(_Experiment):
+    pass
+
+
+class ExperimentOut(_Experiment):
+    id: int
+    ensembles: Optional[List[int]] = None
+
+    class Config:
+        orm_mode = True
+
+
 class _Record(BaseModel):
     pass
 
