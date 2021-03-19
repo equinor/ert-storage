@@ -1,6 +1,6 @@
 import uuid
 import numpy as np
-from typing import Any, Mapping, Optional, List
+from typing import Any, Mapping, Optional, List, AsyncGenerator
 import sqlalchemy as sa
 from fastapi import (
     APIRouter,
@@ -51,7 +51,7 @@ async def post_ensemble_record_file(
     if HAS_AZURE_BLOB_STORAGE:
         key = f"{name}@{realization_index}@{uuid.uuid4()}"
         blob = azure_blob_container.get_blob_client(key)
-        blob.upload_blob(file.file)
+        await blob.upload_blob(file.file)
 
         file_obj.az_container = azure_blob_container.container_name
         file_obj.az_blob = key
@@ -155,8 +155,14 @@ async def get_record(
             )
         elif f.az_container is not None and f.az_blob is not None:
             blob = azure_blob_container.get_blob_client(f.az_blob)
+            download = await blob.download_blob()
+
+            async def chunk_generator() -> AsyncGenerator[bytes, None]:
+                async for chunk in download.chunks():
+                    yield chunk
+
             return StreamingResponse(
-                blob.download_blob().chunks(),
+                chunk_generator(),
                 media_type=f.mimetype,
                 headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
             )

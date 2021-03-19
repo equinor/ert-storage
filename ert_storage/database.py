@@ -49,15 +49,16 @@ async def get_db() -> Any:
 
 
 if HAS_AZURE_BLOB_STORAGE:
+    import asyncio
     from azure.core.exceptions import ResourceNotFoundError
-    from azure.storage.blob import ContainerClient
+    from azure.storage.blob.aio import ContainerClient
 
     azure_blob_container = ContainerClient.from_connection_string(
         os.environ[ENV_BLOB], BLOB_CONTAINER
     )
 
-    try:
-        azure_blob_container.get_container_properties()
-    except ResourceNotFoundError:
-        azure_blob_container.create_container()
-        azure_blob_container.get_container_properties()
+    async def create_container_if_not_exist() -> None:
+        try:
+            await azure_blob_container.get_container_properties()
+        except ResourceNotFoundError:
+            await azure_blob_container.create_container()

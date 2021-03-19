@@ -34,6 +34,7 @@ setup(
         ],
     },
     install_requires=[
+        "aiohttp",
         "alembic",
         "async-exit-stack; python_version < '3.7'",
         "async-generator; python_version < '3.7'",
