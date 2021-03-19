@@ -22,11 +22,23 @@ class _TestClient(TestClient):
 @pytest.fixture
 def client():
     from ert_storage.app import app
-    from ert_storage.database import get_db, engine, IS_SQLITE, IS_POSTGRES
+    from ert_storage.database import (
+        get_db,
+        engine,
+        IS_SQLITE,
+        IS_POSTGRES,
+        HAS_AZURE_BLOB_STORAGE,
+    )
     from ert_storage.database_schema import Base
 
     if IS_SQLITE:
         Base.metadata.create_all(bind=engine)
+    if HAS_AZURE_BLOB_STORAGE:
+        import asyncio
+        from ert_storage.database import create_container_if_not_exist
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(create_container_if_not_exist())
 
     connection = engine.connect()
     transaction = connection.begin()

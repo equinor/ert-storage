@@ -33,12 +33,16 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def initialize_database() -> None:
-    from ert_storage.database import engine, IS_SQLITE
+    from ert_storage.database import engine, IS_SQLITE, HAS_AZURE_BLOB_STORAGE
     from ert_storage.database_schema import Base
 
     if IS_SQLITE:
         # Our SQLite backend doesn't support migrations, so create the database on the fly.
         Base.metadata.create_all(bind=engine)
+    if HAS_AZURE_BLOB_STORAGE:
+        from ert_storage.database import create_container_if_not_exist
+
+        await create_container_if_not_exist()
 
 
 @app.exception_handler(NoResultFound)

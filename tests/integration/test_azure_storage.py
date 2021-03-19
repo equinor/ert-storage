@@ -1,16 +1,25 @@
+import os
 import pytest
 
 
 @pytest.fixture
 def azure_client():
-    from ert_storage.database import HAS_AZURE_BLOB_STORAGE
+    """
+    A synchronous Azure Blob Storage ContainerClient
+    """
+    from ert_storage.database import HAS_AZURE_BLOB_STORAGE, ENV_BLOB, BLOB_CONTAINER
 
     if not HAS_AZURE_BLOB_STORAGE:
         pytest.skip("An Azure Storage connection is required to run these tests")
 
-    from ert_storage.database import azure_blob_container
+    import asyncio
+    from ert_storage.database import create_container_if_not_exist
+    from azure.storage.blob import ContainerClient
 
-    yield azure_blob_container
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(create_container_if_not_exist())
+
+    yield ContainerClient.from_connection_string(os.environ[ENV_BLOB], BLOB_CONTAINER)
 
 
 def test_blob(client, azure_client):
