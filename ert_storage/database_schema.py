@@ -110,3 +110,19 @@ class F64Matrix(Base):
     )
 
     content = sa.Column(FloatArray, nullable=False)
+
+
+class FileBlock(Base):
+    __tablename__ = "file_block"
+    id = sa.Column(sa.Integer, primary_key=True)
+    time_created = sa.Column(sa.DateTime, server_default=func.now())
+    time_updated = sa.Column(
+        sa.DateTime, server_default=func.now(), onupdate=func.now()
+    )
+    block_id = sa.Column(sa.String, nullable=False)
+    block_index = sa.Column(sa.Integer, nullable=False)
+    record_name = sa.Column(sa.String, nullable=False)
+    realization_index = sa.Column(sa.Integer, nullable=True)
+    ensemble_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
+    ensemble = relationship("Ensemble")
+    content = sa.Column(sa.LargeBinary, nullable=True)

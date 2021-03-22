@@ -184,6 +184,42 @@ def test_forward_model_file(client):
             assert resp.status_code == 404
 
 
+def test_blocked_blob(client):
+
+    ensemble_id = _create_ensemble(client)
+
+    size = 12 * 1024 ** 2
+    block_size = 4 * 1024 ** 2
+
+    def _generate_blob_chunks():
+        data = []
+        with open("/dev/urandom", "rb") as file_handle:
+            for _ in range(size // block_size):
+                data.append(file_handle.read(block_size))
+        return data
+
+    client.post_check(
+        f"/ensembles/{ensemble_id}/records/foo/blob",
+    )
+    chunks = _generate_blob_chunks()
+    for i, chunk in enumerate(chunks):
+        client.put_check(
+            f"/ensembles/{ensemble_id}/records/foo/blob",
+            params={"block_index": i},
+            data=chunk,
+        )
+
+    client.patch_check(
+        f"/ensembles/{ensemble_id}/records/foo/blob",
+    )
+
+    resp = client.get_check(
+        f"/ensembles/{ensemble_id}/records/foo",
+    )
+    print(resp.content)
+    assert b"".join(chunks) == resp.content
+
+
 def _create_ensemble(client, parameters=[]):
     resp = client.post("/ensembles", json={"parameters": parameters})
     return resp.json()["id"]
