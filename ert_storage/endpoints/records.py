@@ -10,6 +10,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
     status,
+    Request,
 )
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -68,6 +69,131 @@ async def post_ensemble_record_file(
 
     record_obj.ensemble = ensemble
     db.add(record_obj)
+
+
+@router.put("/ensembles/{ensemble_id}/records/{name}/blob")
+async def add_block(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: int,
+    name: str,
+    realization_index: Optional[int] = None,
+    request: Request,
+    block_index: int,
+) -> None:
+    """
+    Stage blocks to an existing azure blob record.
+    """
+
+    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+    block_id = str(uuid.uuid4())
+
+    file_block_obj = ds.FileBlock(
+        ensemble=ensemble,
+        block_id=block_id,
+        block_index=block_index,
+        record_name=name,
+        realization_index=realization_index,
+    )
+
+    record_obj = (
+        db.query(ds.Record)
+        .filter_by(
+            ensemble_id=ensemble.id, name=name, realization_index=realization_index
+        )
+        .one()
+    )
+    if HAS_AZURE_BLOB_STORAGE:
+        key = record_obj.file.az_blob
+        blob = azure_blob_container.get_blob_client(key)
+        await blob.stage_block(block_id, await request.body())
+    else:
+        file_block_obj.content = await request.body()
+
+    db.add(file_block_obj)
+    db.commit()
+
+
+@router.post("/ensembles/{ensemble_id}/records/{name}/blob")
+async def create_blob(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: int,
+    name: str,
+    realization_index: Optional[int] = None,
+) -> None:
+    """
+    Create a record which points to a blob on Azure Blob Storage.
+    """
+
+    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+    file_obj = ds.File(
+        filename="test",
+        mimetype="mime/type",
+    )
+    if HAS_AZURE_BLOB_STORAGE:
+        key = f"{name}@{realization_index}@{uuid.uuid4()}"
+        blob = azure_blob_container.get_blob_client(key)
+        file_obj.az_container = (azure_blob_container.container_name,)
+        file_obj.az_blob = (key,)
+    else:
+        pass
+
+    db.add(file_obj)
+    record_obj = ds.Record(
+        name=name,
+        record_type=ds.RecordType.file,
+        realization_index=realization_index,
+        file=file_obj,
+    )
+
+    record_obj.ensemble = ensemble
+    db.add(record_obj)
+
+
+@router.patch("/ensembles/{ensemble_id}/records/{name}/blob")
+async def finalize_blob(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: int,
+    name: str,
+    realization_index: Optional[int] = None,
+) -> None:
+    """
+    Commit all staged blocks to a blob record
+    """
+
+    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+
+    record_obj = (
+        db.query(ds.Record)
+        .filter_by(
+            ensemble_id=ensemble.id, name=name, realization_index=realization_index
+        )
+        .one()
+    )
+
+    submitted_blocks = list(
+        db.query(ds.FileBlock)
+        .filter_by(
+            record_name=name,
+            ensemble_id=ensemble.id,
+            realization_index=realization_index,
+        )
+        .all()
+    )
+
+    if HAS_AZURE_BLOB_STORAGE:
+        key = record_obj.file.az_blob
+        blob = azure_blob_container.get_blob_client(key)
+        block_ids = [
+            block.block_id
+            for block in sorted(submitted_blocks, key=lambda x: x.block_index)
+        ]
+        await blob.commit_block_list(block_ids)
+    else:
+        data = b"".join([block.content for block in submitted_blocks])
+        record_obj.file.content = data
 
 
 @router.post("/ensembles/{ensemble_id}/records/{name}/matrix")

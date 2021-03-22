@@ -18,6 +18,20 @@ class _TestClient(TestClient):
             raise AssertionError
         return resp
 
+    def put_check(self, *args, **kwargs):
+        resp = self.put(*args, **kwargs)
+        if resp.status_code != 200:
+            print(resp.text)
+            raise AssertionError
+        return resp
+
+    def patch_check(self, *args, **kwargs):
+        resp = self.patch(*args, **kwargs)
+        if resp.status_code != 200:
+            print(resp.text)
+            raise AssertionError
+        return resp
+
 
 @pytest.fixture
 def client():
