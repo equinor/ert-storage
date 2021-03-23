@@ -24,7 +24,7 @@ BLOB_CONTAINER = os.getenv(ENV_BLOB_CONTAINER, "ert")
 if IS_SQLITE:
     engine = create_engine(URI_RDBMS, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(URI_RDBMS)
+    engine = create_engine(URI_RDBMS, pool_size=50, max_overflow=100)
 Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
