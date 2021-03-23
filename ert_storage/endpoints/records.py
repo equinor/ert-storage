@@ -1,4 +1,5 @@
 import uuid
+import io
 import numpy as np
 from typing import Any, Mapping, Optional, List, AsyncGenerator
 import sqlalchemy as sa
@@ -8,9 +9,10 @@ from fastapi import (
     Depends,
     File,
     HTTPException,
+    Header,
+    Request,
     UploadFile,
     status,
-    Request,
 )
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
@@ -203,7 +205,8 @@ async def post_ensemble_record_matrix(
     ensemble_id: int,
     name: str,
     realization_index: Optional[int] = None,
-    body: Any = Body(...),
+    content_type: str = Header("application/json"),
+    request: Request,
 ) -> None:
     """
     Assign an n-dimensional float matrix, encoded in JSON, to the given `name` record.
@@ -211,7 +214,15 @@ async def post_ensemble_record_matrix(
     ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
 
     try:
-        content = np.array(body, dtype=np.float64)
+        if content_type == "application/json":
+            content = np.array(await request.json(), dtype=np.float64)
+        elif content_type == "application/x-numpy":
+            from numpy.lib.format import read_array
+
+            stream = io.BytesIO(await request.body())
+            content = read_array(stream)
+        else:
+            raise ValueError()
     except ValueError:
         if realization_index is None:
             message = f"Ensemble-wide record '{name}' for ensemble '{ensemble_id}' needs to be a matrix"
@@ -250,6 +261,7 @@ async def get_record(
     ensemble_id: int,
     realization_index: Optional[int] = None,
     name: str,
+    accept: Optional[str] = Header(default="application/json"),
 ) -> Any:
     """
     Get record with a given `name`. If `realization_index` is not set, look for
@@ -270,7 +282,18 @@ async def get_record(
 
     type_ = bundle.record_type
     if type_ == ds.RecordType.float_vector:
-        return bundle.f64_matrix.content
+        if accept == "application/x-numpy":
+            from numpy.lib.format import write_array
+
+            stream = io.BytesIO()
+            write_array(stream, np.array(bundle.f64_matrix.content))
+
+            return Response(
+                content=stream.getvalue(),
+                media_type="application/x-numpy",
+            )
+        else:
+            return bundle.f64_matrix.content
     if type_ == ds.RecordType.file:
         f = bundle.file
         if f.content is not None:

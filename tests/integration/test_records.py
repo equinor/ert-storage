@@ -2,6 +2,8 @@ import io
 import json
 import random
 import numpy as np
+import itertools
+import pytest
 from fastapi import status
 
 
@@ -123,17 +125,45 @@ def test_missing_record_exception(client, simple_ensemble):
     assert resp.json()["detail"]["error"] != ""
 
 
-def test_ensemble_matrix(client, simple_ensemble):
+@pytest.mark.parametrize(
+    "get,post", list(itertools.product(["json", "numpy"], repeat=2))
+)
+def test_ensemble_matrix_json(client, simple_ensemble, get, post):
+    from numpy.lib.format import write_array, read_array
+
     ensemble_id = simple_ensemble()
 
     matrix = np.random.rand(5, 8, 13)
 
-    resp = client.post_check(
-        f"/ensembles/{ensemble_id}/records/mat/matrix", json=matrix.tolist()
-    )
-    resp = client.get_check(f"/ensembles/{ensemble_id}/records/mat")
+    # POST
+    post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
+    if post == "json":
+        resp = client.post_check(post_url, json=matrix.tolist())
+    elif post == "numpy":
+        stream = io.BytesIO()
+        write_array(stream, matrix)
+        resp = client.post_check(
+            post_url,
+            data=stream.getvalue(),
+            headers={"content-type": "application/x-numpy"},
+        )
+    else:
+        raise NotImplementedError()
 
-    assert resp.json() == matrix.tolist()
+    # GET
+    get_url = f"/ensembles/{ensemble_id}/records/mat"
+    if get == "json":
+        resp = client.get_check(f"/ensembles/{ensemble_id}/records/mat")
+        assert resp.json() == matrix.tolist()
+    elif get == "numpy":
+        resp = client.get_check(
+            f"/ensembles/{ensemble_id}/records/mat",
+            headers={"accept": "application/x-numpy"},
+        )
+        stream = io.BytesIO(resp.content)
+        assert (read_array(stream) == matrix).all()
+    else:
+        raise NotImplementedError()
 
 
 def test_ensemble_file(client, simple_ensemble):

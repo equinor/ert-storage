@@ -8,28 +8,28 @@ class _TestClient(TestClient):
         resp = self.get(*args, **kwargs)
         if resp.status_code != 200:
             print(resp.text)
-            raise AssertionError
+            raise AssertionError(f"Status code was {resp.status_code}, expected 200")
         return resp
 
     def post_check(self, *args, **kwargs):
         resp = self.post(*args, **kwargs)
         if resp.status_code != 200:
             print(resp.text)
-            raise AssertionError
+            raise AssertionError(f"Status code was {resp.status_code}, expected 200")
         return resp
 
     def put_check(self, *args, **kwargs):
         resp = self.put(*args, **kwargs)
         if resp.status_code != 200:
             print(resp.text)
-            raise AssertionError
+            raise AssertionError(f"Status code was {resp.status_code}, expected 200")
         return resp
 
     def patch_check(self, *args, **kwargs):
         resp = self.patch(*args, **kwargs)
         if resp.status_code != 200:
             print(resp.text)
-            raise AssertionError
+            raise AssertionError(f"Status code was {resp.status_code}, expected 200")
         return resp
 
 
