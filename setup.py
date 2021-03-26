@@ -14,6 +14,9 @@ setup(
         "ert_storage._alembic.alembic",
         "ert_storage._alembic.alembic.versions",
         "ert_storage.endpoints",
+        "ert_storage.ext",
+        "ert_storage.graphql",
+        "ert_storage.json_schema",
     ],
     package_data={
         "ert_storage._alembic": [
@@ -40,11 +43,14 @@ setup(
         "async-generator; python_version < '3.7'",
         "azure-storage-blob",
         "fastapi",
+        "graphene",
+        "graphene-sqlalchemy>=2.0",
         "numpy",
         "pydantic",
         "python-multipart",
         "requests",
-        "sqlalchemy",
+        "sqlalchemy>=1.4",
+        "starlette==0.13.6",
         "uvicorn",
     ],
 )
