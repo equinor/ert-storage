@@ -2,8 +2,10 @@ import json
 from typing import Any
 from fastapi import FastAPI, Request, status
 from fastapi.responses import Response, RedirectResponse
+from starlette.graphql import GraphQLApp
 
-from ert_storage.endpoints import router
+from ert_storage.endpoints import router as endpoints_router
+from ert_storage.graphql import router as graphql_router
 
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -67,4 +69,5 @@ async def healthcheck() -> str:
     return "ALL OK!"
 
 
-app.include_router(router)
+app.include_router(endpoints_router)
+app.include_router(graphql_router)

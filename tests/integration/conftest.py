@@ -4,6 +4,10 @@ from sqlalchemy.orm import sessionmaker
 
 
 class _TestClient(TestClient):
+    def __init__(self, *args, session: sessionmaker, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.session = session
+
     def get_check(self, *args, **kwargs):
         resp = self.get(*args, **kwargs)
         if resp.status_code != 200:
@@ -75,7 +79,7 @@ def client():
             raise
 
     app.dependency_overrides[get_db] = override_get_db
-    yield _TestClient(app)
+    yield _TestClient(app, session=TestSession)
 
     # teardown: rollback database to before the test.
     # For debugging change rollback to commit.

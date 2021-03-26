@@ -1,22 +1,13 @@
 from enum import Enum
-from typing import Any, Optional, Callable
+from typing import Any, Optional
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship, backref
-from sqlalchemy.orm.collections import attribute_mapped_collection
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from sqlalchemy.ext.associationproxy import association_proxy
 
-from ert_storage.database import Base, IS_POSTGRES
+from ert_storage.database import Base
 
-
-if IS_POSTGRES:
-    FloatArray = sa.ARRAY(sa.FLOAT)
-    StringArray = sa.ARRAY(sa.String)
-
-else:
-    FloatArray = sa.PickleType
-    StringArray = sa.PickleType
+from ert_storage.ext.sqlalchemy_arrays import StringArray, FloatArray
 
 
 class RecordType(Enum):
