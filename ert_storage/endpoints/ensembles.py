@@ -10,7 +10,7 @@ router = APIRouter(tags=["ensemble"])
 def post_ensemble(
     *, db: Session = Depends(get_db), ens_in: js.EnsembleIn, experiment_id: int
 ) -> js.EnsembleOut:
-    print(experiment_id)
+
     experiment = db.query(ds.Experiment).get(experiment_id)
     ens = ds.Ensemble(inputs=ens_in.parameters, experiment=experiment)
     db.add(ens)

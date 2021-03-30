@@ -1,9 +1,11 @@
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 
 import sqlalchemy as sa
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.sql import func
+from sqlalchemy.ext.associationproxy import association_proxy
 
 from ert_storage.database import Base, IS_POSTGRES
 
@@ -49,6 +51,17 @@ class Experiment(Base):
     )
     name = sa.Column(sa.String)
     ensembles = relationship("Ensemble", foreign_keys="[Ensemble.experiment_id]")
+    observations = relationship(
+        "Observation", foreign_keys="[Observation.experiment_id]"
+    )
+
+
+observation_record_association = sa.Table(
+    "observation_record_association",
+    Base.metadata,
+    sa.Column("observation_id", sa.Integer, sa.ForeignKey("observation.id")),
+    sa.Column("record_id", sa.Integer, sa.ForeignKey("record.id")),
+)
 
 
 class Record(Base):
@@ -78,6 +91,11 @@ class Record(Base):
     f64_matrix = relationship("F64Matrix")
     ensemble_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
     ensemble = relationship("Ensemble", back_populates="records")
+    observations = relationship(
+        "Observation",
+        secondary=observation_record_association,
+        back_populates="records",
+    )
 
     @property
     def record_type(self) -> RecordType:
@@ -142,3 +160,28 @@ class FileBlock(Base):
     ensemble_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
     ensemble = relationship("Ensemble")
     content = sa.Column(sa.LargeBinary, nullable=True)
+
+
+class Observation(Base):
+    __tablename__ = "observation"
+    __table_args__ = (sa.UniqueConstraint("name", name="uq_observation_name"),)
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    time_created = sa.Column(sa.DateTime, server_default=func.now())
+    time_updated = sa.Column(
+        sa.DateTime, server_default=func.now(), onupdate=func.now()
+    )
+    name = sa.Column(sa.String, nullable=False)
+    x_axis = sa.Column(StringArray, nullable=False)
+    values = sa.Column(FloatArray, nullable=False)
+    errors = sa.Column(FloatArray, nullable=False)
+
+    records = relationship(
+        "Record",
+        secondary=observation_record_association,
+        back_populates="observations",
+    )
+    experiment_id = sa.Column(
+        sa.Integer, sa.ForeignKey("experiment.id"), nullable=False
+    )
+    experiment = relationship("Experiment")
