@@ -255,7 +255,7 @@ async def post_ensemble_record_matrix(
 
 
 @router.get("/ensembles/{ensemble_id}/records/{name}")
-async def get_record(
+async def get_ensemble_record(
     *,
     db: Session = Depends(get_db),
     ensemble_id: int,
@@ -414,3 +414,9 @@ def get_ensemble_records(
         rec.name: js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
         for rec in ensemble.records
     }
+
+
+@router.get("/records/{record_id}", response_model=js.RecordOut)
+def get_record(*, db: Session = Depends(get_db), record_id: int) -> js.RecordOut:
+    rec = db.query(ds.Record).get(record_id)
+    return js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
