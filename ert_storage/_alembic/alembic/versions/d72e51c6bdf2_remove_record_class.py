@@ -26,6 +26,7 @@ def upgrade():
     op.drop_column("record", "consumer_id")
     op.drop_column("record", "producer_id")
     op.drop_column("record", "record_class")
+    op.execute("DROP TYPE recordclass")
     # ### end Alembic commands ###
 
 

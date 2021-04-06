@@ -246,3 +246,26 @@ def test_blocked_blob(client, simple_ensemble):
         f"/ensembles/{ensemble_id}/records/foo",
     )
     assert b"".join(chunks) == resp.content
+
+
+def test_responses(client, simple_ensemble):
+    ensemble_id = simple_ensemble()
+    records = [
+        ("rec1", "[1, 2, 3, 4, 5]", "other"),
+        ("rec2", "[5, 4, 3, 2, 1]", "parameter"),
+        ("rec3", "[[1, 2], [4, 5]]", "response"),
+        ("rec4", "[[1, 2], [4, 5]]", None),
+    ]
+    for name, data, record_class in records:
+        client.post_check(
+            f"/ensembles/{ensemble_id}/records/{name}/matrix",
+            data=data,
+            params={
+                "record_class": record_class,
+            },
+        )
+
+    responses = client.get_check(f"/ensembles/{ensemble_id}/responses").json()
+    assert len(responses) == 1
+    assert "rec3" in responses
+    assert responses["rec3"]["data"] == [[1, 2], [4, 5]]

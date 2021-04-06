@@ -11,9 +11,14 @@ from ert_storage.ext.sqlalchemy_arrays import StringArray, FloatArray
 
 
 class RecordType(Enum):
-    parameters = 0
     float_vector = 1
     file = 2
+
+
+class RecordClass(Enum):
+    parameter = 1
+    response = 2
+    other = 3
 
 
 class Ensemble(Base):
@@ -87,6 +92,7 @@ class Record(Base):
         secondary=observation_record_association,
         back_populates="records",
     )
+    record_class = sa.Column(sa.Enum(RecordClass))
 
     @property
     def record_type(self) -> RecordType:

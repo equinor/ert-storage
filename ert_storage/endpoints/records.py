@@ -67,6 +67,7 @@ async def post_ensemble_record_file(
         record_type=ds.RecordType.file,
         realization_index=realization_index,
         file=file_obj,
+        record_class=ds.RecordClass.other,
     )
 
     record_obj.ensemble = ensemble
@@ -147,6 +148,7 @@ async def create_blob(
         record_type=ds.RecordType.file,
         realization_index=realization_index,
         file=file_obj,
+        record_class=ds.RecordClass.other,
     )
 
     record_obj.ensemble = ensemble
@@ -207,6 +209,7 @@ async def post_ensemble_record_matrix(
     realization_index: Optional[int] = None,
     content_type: str = Header("application/json"),
     request: Request,
+    record_class: Optional[str] = None,
 ) -> None:
     """
     Assign an n-dimensional float matrix, encoded in JSON, to the given `name` record.
@@ -243,12 +246,16 @@ async def post_ensemble_record_matrix(
         content=content.tolist(),
     )
     db.add(matrix_obj)
-
+    if not record_class:
+        record_class_enum = ds.RecordClass.other
+    else:
+        record_class_enum = ds.RecordClass.__members__[record_class]
     record_obj = ds.Record(
         name=name,
         record_type=ds.RecordType.float_vector,
         f64_matrix=matrix_obj,
         realization_index=realization_index,
+        record_class=record_class_enum,
     )
     record_obj.ensemble = ensemble
     db.add(record_obj)
@@ -420,3 +427,17 @@ def get_ensemble_records(
 def get_record(*, db: Session = Depends(get_db), record_id: int) -> js.RecordOut:
     rec = db.query(ds.Record).get(record_id)
     return js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
+
+
+@router.get(
+    "/ensembles/{ensemble_id}/responses", response_model=Mapping[str, js.RecordOut]
+)
+def get_ensemble_responses(
+    *, db: Session = Depends(get_db), ensemble_id: int
+) -> Mapping[str, js.RecordOut]:
+    ensemble = db.query(ds.Ensemble).get(ensemble_id)
+    return {
+        rec.name: js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
+        for rec in ensemble.records
+        if rec.record_class == ds.RecordClass.response
+    }
