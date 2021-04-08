@@ -4,7 +4,7 @@ import ert_storage.json_schema as js
 
 
 def _create_dummy_update_id(algorithm, ensemble_id, client, transformations=[]):
-    update_resp = client.post_check(
+    update_resp = client.post(
         f"/updates",
         json=dict(
             ensemble_reference_id=ensemble_id,
@@ -16,7 +16,7 @@ def _create_dummy_update_id(algorithm, ensemble_id, client, transformations=[]):
 
 
 def _get_ensemble(client, ensemble_id) -> js.EnsembleOut:
-    resp = client.get_check(f"ensembles/{ensemble_id}")
+    resp = client.get(f"ensembles/{ensemble_id}")
     return js.EnsembleOut.parse_obj(resp.json())
 
 
@@ -55,7 +55,7 @@ def test_observation_transformations(client, create_ensemble, create_experiment)
     experiment_id = create_experiment("dummy")
     ensemble_parent = create_ensemble(experiment_id)
     for name, obs in OBSERVATIONS.items():
-        client.post_check(
+        client.post(
             f"/experiments/{experiment_id}/observations",
             json=dict(
                 name=name,
@@ -65,7 +65,7 @@ def test_observation_transformations(client, create_ensemble, create_experiment)
             ),
         )
 
-    uploaded_observations = client.get_check(
+    uploaded_observations = client.get(
         f"/experiments/{experiment_id}/observations"
     ).json()
     mapping = {obs["name"]: obs["id"] for obs in uploaded_observations}
@@ -82,9 +82,7 @@ def test_observation_transformations(client, create_ensemble, create_experiment)
         "bogosort", ensemble_parent, client, transformations=transformations
     )
     ensemble_child = create_ensemble(experiment_id, update_id=update_id)
-    used_observations = client.get_check(
-        f"/ensembles/{ensemble_child}/observations"
-    ).json()
+    used_observations = client.get(f"/ensembles/{ensemble_child}/observations").json()
     for obs_json in used_observations:
         obs = js.ObservationOut.parse_obj(obs_json)
         assert obs.transformation.scale == TRANSFORMATIONS[obs.name]["scale"]

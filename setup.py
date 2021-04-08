@@ -25,6 +25,7 @@ setup(
     },
     entry_points={
         "console_scripts": ["ert-storage=ert_storage.__main__:main"],
+        "pytest11": ["ert-storage=ert_storage.testing.pytest11"],
     },
     extras_require={
         "test": [

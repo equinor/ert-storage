@@ -19,25 +19,25 @@ mutation create($experimentId: ID!, $params: [String]) {
 """
 
 
-def test_get_ensemble(gql_client, simple_ensemble):
+def test_get_ensemble(client, simple_ensemble):
     eparams = [rand_name() for _ in range(3)]
     eid = simple_ensemble(eparams)
-    r = gql_client.execute(GET_ENSEMBLE, variable_values={"id": eid})
+    r = client.gql_execute(GET_ENSEMBLE, variable_values={"id": eid})
 
     assert r["data"]["ensemble"]["id"] == str(eid)
     assert r["data"]["ensemble"]["inputs"] == eparams
 
 
-def test_create_ensemble(gql_client, create_experiment):
+def test_create_ensemble(client, create_experiment):
     experiment_id = create_experiment(rand_name())
     eparams = [rand_name() for _ in range(8)]
-    r = gql_client.execute(
+    r = client.gql_execute(
         CREATE_ENSEMBLE,
         variable_values={"experimentId": experiment_id, "params": eparams},
     )
     eid = r["data"]["createEnsemble"]["id"]
 
-    r = gql_client.execute(GET_ENSEMBLE, variable_values={"id": eid})
+    r = client.gql_execute(GET_ENSEMBLE, variable_values={"id": eid})
 
     assert r["data"]["ensemble"]["id"] == eid
     assert r["data"]["ensemble"]["inputs"] == eparams

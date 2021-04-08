@@ -19,7 +19,7 @@ RECORDS = {
 def test_observations(client, create_experiment):
     experiment_id = create_experiment("test_ensembles")
     for name, obs in OBSERVATIONS.items():
-        client.post_check(
+        client.post(
             f"/experiments/{experiment_id}/observations",
             json=dict(
                 name=name,
@@ -29,7 +29,7 @@ def test_observations(client, create_experiment):
             ),
         )
 
-    uploaded_observations = client.get_check(
+    uploaded_observations = client.get(
         f"/experiments/{experiment_id}/observations"
     ).json()
     for obs in uploaded_observations:
@@ -45,17 +45,15 @@ def test_observations_with_records(client, create_experiment, create_ensemble):
     record_obs_association = {"OBS1": "FOPR", "OBS2": "LOPR", "OBS3": "LOPR"}
 
     for record, values in RECORDS.items():
-        client.post_check(
-            f"/ensembles/{ensemble_id}/records/{record}/matrix", json=values
-        )
-    ensemble_records = client.get_check(
+        client.post(f"/ensembles/{ensemble_id}/records/{record}/matrix", json=values)
+    ensemble_records = client.get(
         f"/ensembles/{ensemble_id}/records",
     ).json()
 
     for name, obs in OBSERVATIONS.items():
         record_name = record_obs_association[name]
         record = ensemble_records[record_name]
-        client.post_check(
+        client.post(
             f"/experiments/{experiment_id}/observations",
             json=dict(
                 name=name,
@@ -66,11 +64,11 @@ def test_observations_with_records(client, create_experiment, create_ensemble):
             ),
         )
 
-    uploaded_observations = client.get_check(
+    uploaded_observations = client.get(
         f"/experiments/{experiment_id}/observations"
     ).json()
 
     for obs in uploaded_observations:
         record_id = obs["records"][0]
-        rec_obj = client.get_check(f"/records/{record_id}").json()
+        rec_obj = client.get(f"/records/{record_id}").json()
         assert record_obs_association[obs["name"]] == rec_obj["name"]

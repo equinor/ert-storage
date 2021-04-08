@@ -23,18 +23,18 @@ def test_list(client, simple_ensemble):
     resp = client.get(f"/ensembles/{ensemble_id}/records")
     assert resp.json() == {}
 
-    client.post_check(f"/ensembles/{ensemble_id}/records/hello/matrix", data="[]")
-    client.post_check(
+    client.post(f"/ensembles/{ensemble_id}/records/hello/matrix", data="[]")
+    client.post(
         f"/ensembles/{ensemble_id}/records/foo/file",
         params=dict(realization_index=1),
         files={"file": ("foo.bar", io.BytesIO(), "foo/bar")},
     )
-    client.post_check(
+    client.post(
         f"/ensembles/{ensemble_id}/records/world/matrix",
         data="[]",
     )
 
-    resp = client.get_check(f"/ensembles/{ensemble_id}/records")
+    resp = client.get(f"/ensembles/{ensemble_id}/records")
     assert set(resp.json().keys()) == {"hello", "world", "foo"}
 
 
@@ -45,21 +45,21 @@ def test_parameters(client, simple_ensemble):
         data=f"{PARAMETERS}",
     )
 
-    resp = client.get_check(f"/ensembles/{ensemble_id}/parameters")
+    resp = client.get(f"/ensembles/{ensemble_id}/parameters")
     assert resp.json() == ["coeffs"]
 
-    resp = client.get_check(f"/ensembles/{ensemble_id}/records/coeffs")
+    resp = client.get(f"/ensembles/{ensemble_id}/records/coeffs")
     assert resp.json() == PARAMETERS
 
     for realization_index in range(NUM_REALIZATIONS):
-        client.post_check(
+        client.post(
             f"/ensembles/{ensemble_id}/records/indexed_coeffs/matrix",
             params=dict(realization_index=realization_index),
             data=f"{PARAMETERS[realization_index]}",
         )
 
     for realization_index in range(NUM_REALIZATIONS):
-        resp = client.get_check(
+        resp = client.get(
             f"/ensembles/{ensemble_id}/records/indexed_coeffs",
             params=dict(realization_index=realization_index),
         )
@@ -82,6 +82,7 @@ def test_matrix(client, simple_ensemble):
             resp = client.post(
                 f"/ensembles/{ensemble_id}/records/{name}/matrix",
                 data=data,
+                check_status_code=None,
             )
         except Exception:
             if status_code == status.HTTP_200_OK:
@@ -116,7 +117,9 @@ def test_missing_record_exception(client, simple_ensemble):
     ensemble_id = simple_ensemble()
 
     record_name = "coeffs_typo"
-    resp = client.get(f"/ensembles/{ensemble_id}/records/{record_name}")
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/{record_name}", check_status_code=None
+    )
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
     assert "detail" in resp.json()
@@ -138,11 +141,11 @@ def test_ensemble_matrix_json(client, simple_ensemble, get, post):
     # POST
     post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
     if post == "json":
-        resp = client.post_check(post_url, json=matrix.tolist())
+        resp = client.post(post_url, json=matrix.tolist())
     elif post == "numpy":
         stream = io.BytesIO()
         write_array(stream, matrix)
-        resp = client.post_check(
+        resp = client.post(
             post_url,
             data=stream.getvalue(),
             headers={"content-type": "application/x-numpy"},
@@ -153,10 +156,10 @@ def test_ensemble_matrix_json(client, simple_ensemble, get, post):
     # GET
     get_url = f"/ensembles/{ensemble_id}/records/mat"
     if get == "json":
-        resp = client.get_check(f"/ensembles/{ensemble_id}/records/mat")
+        resp = client.get(f"/ensembles/{ensemble_id}/records/mat")
         assert resp.json() == matrix.tolist()
     elif get == "numpy":
-        resp = client.get_check(
+        resp = client.get(
             f"/ensembles/{ensemble_id}/records/mat",
             headers={"accept": "application/x-numpy"},
         )
@@ -171,11 +174,11 @@ def test_ensemble_file(client, simple_ensemble):
 
     with open("/dev/urandom", "rb") as f:
         data = f.read(random.randint(2 ** 16, 2 ** 24))
-    client.post_check(
+    client.post(
         f"/ensembles/{ensemble_id}/records/foo/file",
         files={"file": ("somefile", io.BytesIO(data), "foo/!@#$%^&*")},
     )
-    resp = client.get_check(f"/ensembles/{ensemble_id}/records/foo")
+    resp = client.get(f"/ensembles/{ensemble_id}/records/foo")
     assert resp.status_code == 200
     assert resp.content == data
 
@@ -188,20 +191,21 @@ def test_forward_model_file(client, simple_ensemble):
         data_b = f.read(random.randint(2 ** 16, 2 ** 24))
     index_a, index_b = random.sample(range(NUM_REALIZATIONS), 2)
 
-    client.post_check(
+    client.post(
         f"/ensembles/{ensemble_id}/records/foo/file?realization_index={index_a}",
         files={"file": ("first_file", io.BytesIO(data_a), "foo/bar")},
     )
-    client.post_check(
+    client.post(
         f"/ensembles/{ensemble_id}/records/foo/file?realization_index={index_b}",
         files={"file": ("second_file", io.BytesIO(data_b), "!@#$%^&*()")},
     )
 
-    resp = client.get(f"/ensembles/{ensemble_id}/records/foo")
+    resp = client.get(f"/ensembles/{ensemble_id}/records/foo", check_status_code=None)
     assert resp.status_code == 404
     for realization_index in range(NUM_REALIZATIONS):
         resp = client.get(
-            f"/ensembles/{ensemble_id}/records/foo?realization_index={realization_index}"
+            f"/ensembles/{ensemble_id}/records/foo?realization_index={realization_index}",
+            check_status_code=None,
         )
         if realization_index == index_a:
             assert resp.status_code == 200
@@ -227,22 +231,22 @@ def test_blocked_blob(client, simple_ensemble):
                 data.append(file_handle.read(block_size))
         return data
 
-    client.post_check(
+    client.post(
         f"/ensembles/{ensemble_id}/records/foo/blob",
     )
     chunks = _generate_blob_chunks()
     for i, chunk in enumerate(chunks):
-        client.put_check(
+        client.put(
             f"/ensembles/{ensemble_id}/records/foo/blob",
             params={"block_index": i},
             data=chunk,
         )
 
-    client.patch_check(
+    client.patch(
         f"/ensembles/{ensemble_id}/records/foo/blob",
     )
 
-    resp = client.get_check(
+    resp = client.get(
         f"/ensembles/{ensemble_id}/records/foo",
     )
     assert b"".join(chunks) == resp.content
@@ -257,7 +261,7 @@ def test_responses(client, simple_ensemble):
         ("rec4", "[[1, 2], [4, 5]]", None),
     ]
     for name, data, record_class in records:
-        client.post_check(
+        client.post(
             f"/ensembles/{ensemble_id}/records/{name}/matrix",
             data=data,
             params={
@@ -265,7 +269,7 @@ def test_responses(client, simple_ensemble):
             },
         )
 
-    responses = client.get_check(f"/ensembles/{ensemble_id}/responses").json()
+    responses = client.get(f"/ensembles/{ensemble_id}/responses").json()
     assert len(responses) == 1
     assert "rec3" in responses
     assert responses["rec3"]["data"] == [[1, 2], [4, 5]]

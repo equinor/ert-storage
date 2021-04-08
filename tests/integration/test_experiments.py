@@ -1,5 +1,5 @@
 import numpy as np
-import pytest
+from fastapi import status
 
 
 def test_list(client, create_experiment):
@@ -10,7 +10,7 @@ def test_list(client, create_experiment):
 
     docs = [
         exp
-        for exp in client.get_check("/experiments").json()
+        for exp in client.get("/experiments").json()
         if exp["name"] in expected_experiments
     ]
 
@@ -23,7 +23,7 @@ def test_ensembles(client, create_experiment, create_ensemble):
     ids = {create_ensemble(experiment_id) for _ in range(5)}
 
     # Ensembles exist when using experiment list endpoint
-    docs = client.get_check("/experiments").json()
+    docs = client.get("/experiments").json()
     for doc in docs:  # Python doesn't have a built-in find function :(
         if doc["id"] == experiment_id:
             break
@@ -34,7 +34,7 @@ def test_ensembles(client, create_experiment, create_ensemble):
     assert ids == set(doc["ensembles"])
 
     # The list of ensembles belonging to the newly created experiment matches
-    resp = client.get_check(f"/experiments/{experiment_id}/ensembles")
+    resp = client.get(f"/experiments/{experiment_id}/ensembles")
     assert ids == {ens["id"] for ens in resp.json()}
 
 
@@ -46,7 +46,7 @@ def test_delete_experiment(client, create_experiment, create_ensemble):
 
     # POST
     post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
-    resp = client.post_check(post_url, json=matrix.tolist())
+    client.post(post_url, json=matrix.tolist())
     OBSERVATIONS = {
         "OBS1": {
             "values": [1, 2, 3],
@@ -65,7 +65,7 @@ def test_delete_experiment(client, create_experiment, create_ensemble):
         },
     }
     for name, obs in OBSERVATIONS.items():
-        client.post_check(
+        client.post(
             f"/experiments/{experiment_id}/observations",
             json=dict(
                 name=name,
@@ -74,11 +74,9 @@ def test_delete_experiment(client, create_experiment, create_ensemble):
                 x_axis=obs["x_axis"],
             ),
         )
-    obsertvations = client.get_check(
-        f"/experiments/{experiment_id}/observations"
-    ).json()
-    resp = client.delete_check(f"/experiments/{experiment_id}")
-    assert len(client.get_check(f"/experiments").json()) == 0
-    for obs in obsertvations:
-        with pytest.raises(AssertionError):
-            client.get_check(f"/observations/{obs['id']}")
+    observations = client.get(f"/experiments/{experiment_id}/observations").json()
+    client.delete(f"/experiments/{experiment_id}")
+    assert len(client.get(f"/experiments").json()) == 0
+    for obs in observations:
+        resp = client.get(f"/observations/{obs['id']}", check_status_code=None)
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
