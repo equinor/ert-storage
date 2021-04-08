@@ -12,11 +12,16 @@ def get_experiments(
     *,
     db: Session = Depends(get_db),
 ) -> List[js.ExperimentOut]:
-    return db.query(ds.Experiment).all()
+    return [
+        js.ExperimentOut(
+            id=exp.id, name=exp.name, ensembles=[ens.id for ens in exp.ensembles]
+        )
+        for exp in db.query(ds.Experiment).all()
+    ]
 
 
 @router.post("/experiments", response_model=js.ExperimentOut)
-def post_experiements(
+def post_experiments(
     *,
     db: Session = Depends(get_db),
     ens_in: js.ExperimentIn,
@@ -30,7 +35,7 @@ def post_experiements(
 @router.get(
     "/experiments/{experiment_id}/ensembles", response_model=List[js.EnsembleOut]
 )
-def get_experiement_ensembles(
+def get_experiment_ensembles(
     *, db: Session = Depends(get_db), experiment_id: int
 ) -> List[js.EnsembleOut]:
     experiment = db.query(ds.Experiment).get(experiment_id)
