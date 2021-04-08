@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
@@ -21,7 +21,17 @@ class RecordClass(Enum):
     other = 3
 
 
-class Ensemble(Base):
+class MetadataField:
+    _metadata = sa.Column("metadata", sa.JSON, nullable=True)
+
+    @property
+    def metadata_dict(self) -> Mapping[str, Any]:
+        if self._metadata is None:
+            return dict()
+        return self._metadata
+
+
+class Ensemble(Base, MetadataField):
     __tablename__ = "ensemble"
 
     id = sa.Column(sa.Integer, primary_key=True)
@@ -46,7 +56,7 @@ class Ensemble(Base):
     )
 
 
-class Experiment(Base):
+class Experiment(Base, MetadataField):
     __tablename__ = "experiment"
 
     id = sa.Column(sa.Integer, primary_key=True)
@@ -69,7 +79,7 @@ observation_record_association = sa.Table(
 )
 
 
-class Record(Base):
+class Record(Base, MetadataField):
     __tablename__ = "record"
 
     def __init__(
@@ -168,7 +178,7 @@ class FileBlock(Base):
     content = sa.Column(sa.LargeBinary, nullable=True)
 
 
-class Observation(Base):
+class Observation(Base, MetadataField):
     __tablename__ = "observation"
     __table_args__ = (sa.UniqueConstraint("name", name="uq_observation_name"),)
 

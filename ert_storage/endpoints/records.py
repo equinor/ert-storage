@@ -17,9 +17,9 @@ from fastapi import (
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.orm.attributes import flag_modified
 from ert_storage.database import Session, get_db, HAS_AZURE_BLOB_STORAGE, BLOB_CONTAINER
 from ert_storage import database_schema as ds, json_schema as js
-
 
 if HAS_AZURE_BLOB_STORAGE:
     from ert_storage.database import azure_blob_container
@@ -261,6 +261,69 @@ async def post_ensemble_record_matrix(
     db.add(record_obj)
 
 
+@router.put("/ensembles/{ensemble_id}/records/{name}/metadata")
+async def replace_record_metadata(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: int,
+    name: str,
+    realization_index: Optional[int] = None,
+    body: Any = Body(...),
+) -> None:
+    """
+    Assign new metadata json
+    """
+    if realization_index is None:
+        record_obj = _get_ensemble_record(db, ensemble_id, name)
+    else:
+        record_obj = _get_forward_model_record(db, ensemble_id, name, realization_index)
+    record_obj._metadata = body
+    db.commit()
+
+
+@router.patch("/ensembles/{ensemble_id}/records/{name}/metadata")
+async def patch_record_metadata(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: int,
+    name: str,
+    realization_index: Optional[int] = None,
+    body: Any = Body(...),
+) -> None:
+    """
+    Update metadata json
+    """
+    if realization_index is None:
+        record_obj = _get_ensemble_record(db, ensemble_id, name)
+    else:
+        record_obj = _get_forward_model_record(db, ensemble_id, name, realization_index)
+
+    record_obj._metadata.update(body)
+    flag_modified(record_obj, "_metadata")
+    db.commit()
+
+
+@router.get(
+    "/ensembles/{ensemble_id}/records/{name}/metadata", response_model=Mapping[str, Any]
+)
+async def get_record_metadata(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: int,
+    name: str,
+    realization_index: Optional[int] = None,
+) -> Mapping[str, Any]:
+    """
+    Get metadata json
+    """
+    if realization_index is None:
+        bundle = _get_ensemble_record(db, ensemble_id, name)
+    else:
+        bundle = _get_forward_model_record(db, ensemble_id, name, realization_index)
+
+    return bundle.metadata_dict
+
+
 @router.get("/ensembles/{ensemble_id}/records/{name}")
 async def get_ensemble_record(
     *,
@@ -418,7 +481,9 @@ def get_ensemble_records(
 ) -> Mapping[str, js.RecordOut]:
     ensemble = db.query(ds.Ensemble).get(ensemble_id)
     return {
-        rec.name: js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
+        rec.name: js.RecordOut(
+            id=rec.id, name=rec.name, data=rec.data, metadata=rec.metadata_dict
+        )
         for rec in ensemble.records
     }
 
@@ -426,7 +491,9 @@ def get_ensemble_records(
 @router.get("/records/{record_id}", response_model=js.RecordOut)
 def get_record(*, db: Session = Depends(get_db), record_id: int) -> js.RecordOut:
     rec = db.query(ds.Record).get(record_id)
-    return js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
+    return js.RecordOut(
+        id=rec.id, name=rec.name, data=rec.data, metadata=rec.metadata_dict
+    )
 
 
 @router.get(
@@ -437,7 +504,9 @@ def get_ensemble_responses(
 ) -> Mapping[str, js.RecordOut]:
     ensemble = db.query(ds.Ensemble).get(ensemble_id)
     return {
-        rec.name: js.RecordOut(id=rec.id, name=rec.name, data=rec.data)
+        rec.name: js.RecordOut(
+            id=rec.id, name=rec.name, data=rec.data, metadata=rec.metadata_dict
+        )
         for rec in ensemble.records
         if rec.record_class == ds.RecordClass.response
     }

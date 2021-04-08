@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Mapping, Optional, Any
 from pydantic import BaseModel
 
 
@@ -13,6 +13,7 @@ class ExperimentIn(_Experiment):
 class ExperimentOut(_Experiment):
     id: int
     ensembles: List[int]
+    metadata: Mapping[str, Any] = {}
 
     class Config:
         orm_mode = True
