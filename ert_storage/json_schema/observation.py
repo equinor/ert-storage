@@ -3,6 +3,24 @@ from pydantic import BaseModel
 from .record import RecordOut
 
 
+class _ObservationTransformation(BaseModel):
+    name: str
+    active: List[bool]
+    scale: List[float]
+    observation_id: int
+
+
+class ObservationTransformationIn(_ObservationTransformation):
+    pass
+
+
+class ObservationTransformationOut(_ObservationTransformation):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
 class _Observation(BaseModel):
     name: str
     errors: List[float]
@@ -17,6 +35,7 @@ class ObservationIn(_Observation):
 
 class ObservationOut(_Observation):
     id: int
+    transformation: Optional[ObservationTransformationOut] = None
 
     class Config:
         orm_mode = True

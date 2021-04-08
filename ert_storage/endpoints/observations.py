@@ -47,3 +47,38 @@ def get_observations(
         )
         for obs in experiment.observations
     ]
+
+
+@router.get(
+    "/ensembles/{ensemble_id}/observations", response_model=List[js.ObservationOut]
+)
+def get_observations_with_transformation(
+    *, db: Session = Depends(get_db), ensemble_id: int
+) -> List[js.ObservationOut]:
+    ens = db.query(ds.Ensemble).get(ensemble_id)
+    experiment = ens.experiment
+    update = ens.parent
+    transformations = {
+        trans.observation.name: trans for trans in update.observation_transformations
+    }
+
+    return [
+        js.ObservationOut(
+            id=obs.id,
+            name=obs.name,
+            x_axis=obs.x_axis,
+            errors=obs.errors,
+            values=obs.values,
+            records=[rec.id for rec in obs.records],
+            transformation=js.ObservationTransformationOut(
+                id=transformations[obs.name].id,
+                name=obs.name,
+                observation_id=obs.id,
+                scale=transformations[obs.name].scale_list,
+                active=transformations[obs.name].active_list,
+            )
+            if obs.name in transformations
+            else None,
+        )
+        for obs in experiment.observations
+    ]
