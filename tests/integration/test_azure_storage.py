@@ -1,6 +1,5 @@
 import os
 import pytest
-import io
 
 
 @pytest.fixture
@@ -30,11 +29,11 @@ def test_blob(client, azure_client, simple_ensemble):
     pre_blobs = {blob.name for blob in azure_client.list_blobs()}
 
     # Standard file upload and download
-    client.post_check(
+    client.post(
         f"/ensembles/{ensemble_id}/records/foo/file",
         files={"file": ("somefile", open("/bin/bash", "rb"), "foo/bar")},
     )
-    resp = client.get_check(f"/ensembles/{ensemble_id}/records/foo")
+    resp = client.get(f"/ensembles/{ensemble_id}/records/foo")
     assert resp.status_code == 200
 
     # List all blobs after adding file
@@ -61,22 +60,22 @@ def test_blocked_blob(client, azure_client, simple_ensemble):
                 data.append(file_handle.read(block_size))
         return data
 
-    client.post_check(
+    client.post(
         f"/ensembles/{ensemble_id}/records/foo/blob",
     )
     chunks = _generate_blob_chunks()
     for i, chunk in enumerate(chunks):
-        client.put_check(
+        client.put(
             f"/ensembles/{ensemble_id}/records/foo/blob",
             params={"block_index": i},
             data=chunk,
         )
 
-    client.patch_check(
+    client.patch(
         f"/ensembles/{ensemble_id}/records/foo/blob",
     )
 
-    resp = client.get_check(
+    resp = client.get(
         f"/ensembles/{ensemble_id}/records/foo",
     )
 
