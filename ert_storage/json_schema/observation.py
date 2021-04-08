@@ -1,4 +1,4 @@
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Mapping
 from pydantic import BaseModel
 
 
@@ -35,6 +35,7 @@ class ObservationIn(_Observation):
 class ObservationOut(_Observation):
     id: int
     transformation: Optional[ObservationTransformationOut] = None
+    metadata: Mapping[str, Any] = {}
 
     class Config:
         orm_mode = True

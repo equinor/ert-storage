@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
-from typing import List
+from fastapi import APIRouter, Depends, Body
+from typing import List, Any, Mapping
+from sqlalchemy.orm.attributes import flag_modified
 from ert_storage.database import Session, get_db
 from ert_storage import database_schema as ds, json_schema as js
 
@@ -7,10 +8,12 @@ from ert_storage import database_schema as ds, json_schema as js
 router = APIRouter(tags=["ensemble"])
 
 
-@router.post("/experiments/{experiment_id}/observations")
+@router.post(
+    "/experiments/{experiment_id}/observations", response_model=js.ObservationOut
+)
 def post_observation(
     *, db: Session = Depends(get_db), obs_in: js.ObservationIn, experiment_id: int
-) -> None:
+) -> js.ObservationOut:
     experiment = db.query(ds.Experiment).get(experiment_id)
     records = (
         [db.query(ds.Record).get(rec_id) for rec_id in obs_in.records]
@@ -25,8 +28,19 @@ def post_observation(
         experiment=experiment,
         records=records,
     )
+
     db.add(obs)
     db.commit()
+
+    return js.ObservationOut(
+        id=obs.id,
+        name=obs.name,
+        x_axis=obs.x_axis,
+        errors=obs.errors,
+        values=obs.values,
+        records=[rec.id for rec in obs.records],
+        metadata=obs.metadata_dict,
+    )
 
 
 @router.get(
@@ -44,6 +58,7 @@ def get_observations(
             errors=obs.errors,
             values=obs.values,
             records=[rec.id for rec in obs.records],
+            metadata=obs.metadata_dict,
         )
         for obs in experiment.observations
     ]
@@ -70,6 +85,7 @@ def get_observations_with_transformation(
             errors=obs.errors,
             values=obs.values,
             records=[rec.id for rec in obs.records],
+            metadata=obs.metadata_dict,
             transformation=js.ObservationTransformationOut(
                 id=transformations[obs.name].id,
                 name=obs.name,
@@ -82,3 +98,47 @@ def get_observations_with_transformation(
         )
         for obs in experiment.observations
     ]
+
+
+@router.put("/observations/{obs_id}/metadata")
+async def replace_observation_metadata(
+    *,
+    db: Session = Depends(get_db),
+    obs_id: int,
+    body: Any = Body(...),
+) -> None:
+    """
+    Assign new metadata json
+    """
+    obs = db.query(ds.Observation).get(obs_id)
+    obs._metadata = body
+    db.commit()
+
+
+@router.patch("/observations/{obs_id}/metadata")
+async def patch_observation_metadata(
+    *,
+    db: Session = Depends(get_db),
+    obs_id: int,
+    body: Any = Body(...),
+) -> None:
+    """
+    Update metadata json
+    """
+    obs = db.query(ds.Observation).get(obs_id)
+    obs._metadata.update(body)
+    flag_modified(obs, "_metadata")
+    db.commit()
+
+
+@router.get("/observations/{obs_id}/metadata", response_model=Mapping[str, Any])
+async def get_observation_metadata(
+    *,
+    db: Session = Depends(get_db),
+    obs_id: int,
+) -> Mapping[str, Any]:
+    """
+    Get metadata json
+    """
+    obs = db.query(ds.Observation).get(obs_id)
+    return obs.metadata_dict
