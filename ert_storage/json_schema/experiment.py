@@ -12,7 +12,7 @@ class ExperimentIn(_Experiment):
 
 class ExperimentOut(_Experiment):
     id: int
-    ensembles: Optional[List[int]] = None
+    ensembles: List[int]
 
     class Config:
         orm_mode = True
