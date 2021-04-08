@@ -35,6 +35,15 @@ class Ensemble(Base):
         sa.Integer, sa.ForeignKey("experiment.id"), nullable=False
     )
     experiment = relationship("Experiment", back_populates="ensembles")
+    children = relationship(
+        "Update",
+        foreign_keys="[Update.ensemble_reference_id]",
+    )
+    parent = relationship(
+        "Update",
+        uselist=False,
+        foreign_keys="[Update.ensemble_result_id]",
+    )
 
 
 class Experiment(Base):
@@ -182,3 +191,50 @@ class Observation(Base):
         sa.Integer, sa.ForeignKey("experiment.id"), nullable=False
     )
     experiment = relationship("Experiment")
+
+
+class ObservationTransformation(Base):
+    __tablename__ = "observation_transformation"
+    id = sa.Column(sa.Integer, primary_key=True)
+    active_list = sa.Column(sa.PickleType, nullable=False)
+    scale_list = sa.Column(sa.PickleType, nullable=False)
+
+    observation_id = sa.Column(
+        sa.Integer, sa.ForeignKey("observation.id"), nullable=False
+    )
+    observation = relationship("Observation")
+
+    update_id = sa.Column(sa.Integer, sa.ForeignKey("update.id"), nullable=False)
+    update = relationship("Update", back_populates="observation_transformations")
+
+
+class Update(Base):
+    __tablename__ = "update"
+    __table_args__ = (
+        sa.UniqueConstraint("ensemble_result_id", name="uq_update_result_id"),
+    )
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    algorithm = sa.Column(sa.String, nullable=False)
+    ensemble_reference_id = sa.Column(
+        sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True
+    )
+    ensemble_result_id = sa.Column(
+        sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True
+    )
+
+    ensemble_reference = relationship(
+        "Ensemble",
+        foreign_keys=[ensemble_reference_id],
+        back_populates="children",
+    )
+    ensemble_result = relationship(
+        "Ensemble",
+        foreign_keys=[ensemble_result_id],
+        uselist=False,
+        back_populates="parent",
+    )
+    observation_transformations = relationship(
+        "ObservationTransformation",
+        foreign_keys="[ObservationTransformation.update_id]",
+    )
