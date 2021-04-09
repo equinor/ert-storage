@@ -3,7 +3,7 @@ import ert_storage.json_schema as js
 
 def _create_dummy_update_id(algorithm, ensemble_id, client, transformations=[]):
     update_resp = client.post_check(
-        f"/ensembles/{ensemble_id}/updates",
+        f"/updates",
         json=dict(
             ensemble_reference_id=ensemble_id,
             algorithm=algorithm,

@@ -1,6 +1,5 @@
 from typing import List, Optional, Any
 from pydantic import BaseModel
-from .record import RecordOut
 
 
 class _ObservationTransformation(BaseModel):
