@@ -1,5 +1,6 @@
-import time
-import datetime
+from uuid import uuid4
+from ert_storage.testing import ClientError
+import pytest
 
 OBSERVATIONS = {
     "OBS1": {"values": [1, 2, 3], "errors": [0.1, 0.2, 0.3], "x_axis": ["0", "1", "2"]},
@@ -72,3 +73,60 @@ def test_observations_with_records(client, create_experiment, create_ensemble):
         record_id = obs["records"][0]
         rec_obj = client.get(f"/records/{record_id}").json()
         assert record_obs_association[obs["name"]] == rec_obj["name"]
+
+
+def test_records_with_observations(client, create_experiment, create_ensemble):
+    experiment_id = create_experiment("test_ensembles")
+    ensemble_id = create_ensemble(experiment_id=experiment_id)
+    record_obs_association = {"OBS1": "FOPR", "OBS2": "LOPR", "OBS3": "MOPR"}
+
+    for name, obs in OBSERVATIONS.items():
+        client.post(
+            f"/experiments/{experiment_id}/observations",
+            json=dict(
+                name=name,
+                values=obs["values"],
+                errors=obs["errors"],
+                x_axis=obs["x_axis"],
+            ),
+        )
+
+    uploaded_observations = client.get(
+        f"/experiments/{experiment_id}/observations"
+    ).json()
+
+    def get_obs_id(record_name):
+        for obs in uploaded_observations:
+            if record_name == record_obs_association[obs["name"]]:
+                return obs["id"]
+        return None
+
+    for record, values in RECORDS.items():
+        client.post(f"/ensembles/{ensemble_id}/records/{record}/matrix", json=values)
+        obs_id = get_obs_id(record)
+        if obs_id:
+            client.post(
+                f"/ensembles/{ensemble_id}/records/{record}/observations", json=[obs_id]
+            )
+
+    # post observation which doesn't exist
+    with pytest.raises(ClientError):
+        client.post(
+            f"/ensembles/{ensemble_id}/records/FOPR/observations",
+            json=[str(uuid4())],
+        )
+
+    # re-download the observations that should contain updated records
+    uploaded_observations = client.get(
+        f"/experiments/{experiment_id}/observations"
+    ).json()
+    for obs in uploaded_observations:
+        record_id = obs["records"][0]
+
+        rec_obj = client.get(f"/records/{record_id}").json()
+        assert record_obs_association[obs["name"]] == rec_obj["name"]
+
+        obs_from_record = client.get(
+            f"/ensembles/{ensemble_id}/records/{rec_obj['name']}/observations",
+        ).json()
+        assert obs == obs_from_record[0]
