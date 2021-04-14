@@ -324,6 +324,67 @@ async def get_record_metadata(
     return bundle.metadata_dict
 
 
+@router.post("/ensembles/{ensemble_id}/records/{name}/observations")
+async def post_record_observations(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: UUID,
+    name: str,
+    realization_index: Optional[int] = None,
+    observation_ids: List[UUID] = Body(...),
+) -> None:
+
+    if realization_index is None:
+        record_obj = _get_ensemble_record(db, ensemble_id, name)
+    else:
+        record_obj = _get_forward_model_record(db, ensemble_id, name, realization_index)
+
+    observations = (
+        db.query(ds.Observation).filter(ds.Observation.id.in_(observation_ids)).all()
+    )
+    if observations:
+        record_obj.observations = observations
+        flag_modified(record_obj, "observations")
+        db.commit()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": f"Problem with linking observations {observation_ids} to record {name}!",
+                "name": name,
+                "ensemble_id": ensemble_id,
+            },
+        )
+
+
+@router.get("/ensembles/{ensemble_id}/records/{name}/observations")
+async def get_record_observations(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: UUID,
+    name: str,
+    realization_index: Optional[int] = None,
+) -> List[js.ObservationOut]:
+    if realization_index is None:
+        bundle = _get_ensemble_record(db, ensemble_id, name)
+    else:
+        bundle = _get_forward_model_record(db, ensemble_id, name, realization_index)
+    if bundle.observations:
+        return [
+            js.ObservationOut(
+                id=obs.id,
+                name=obs.name,
+                x_axis=obs.x_axis,
+                errors=obs.errors,
+                values=obs.values,
+                records=[rec.id for rec in obs.records],
+                metadata=obs.metadata_dict,
+            )
+            for obs in bundle.observations
+        ]
+    return []
+
+
 @router.get("/ensembles/{ensemble_id}/records/{name}")
 async def get_ensemble_record(
     *,
