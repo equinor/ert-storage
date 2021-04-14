@@ -36,6 +36,13 @@ class _TestClient(TestClient):
             raise AssertionError(f"Status code was {resp.status_code}, expected 200")
         return resp
 
+    def delete_check(self, *args, **kwargs):
+        resp = self.delete(*args, **kwargs)
+        if resp.status_code != 200:
+            print(resp.text)
+            raise AssertionError(f"Status code was {resp.status_code}, expected 200")
+        return resp
+
 
 @pytest.fixture
 def client():

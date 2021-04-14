@@ -40,7 +40,9 @@ class Ensemble(Base, MetadataField):
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
     inputs = sa.Column(StringArray)
-    records = relationship("Record", foreign_keys="[Record.ensemble_id]")
+    records = relationship(
+        "Record", foreign_keys="[Record.ensemble_id]", cascade="all, delete-orphan"
+    )
     experiment_id = sa.Column(
         sa.Integer, sa.ForeignKey("experiment.id"), nullable=False
     )
@@ -53,6 +55,7 @@ class Ensemble(Base, MetadataField):
         "Update",
         uselist=False,
         foreign_keys="[Update.ensemble_result_id]",
+        cascade="all, delete-orphan",
     )
 
 
@@ -65,9 +68,15 @@ class Experiment(Base, MetadataField):
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
     name = sa.Column(sa.String)
-    ensembles = relationship("Ensemble", foreign_keys="[Ensemble.experiment_id]")
+    ensembles = relationship(
+        "Ensemble",
+        foreign_keys="[Ensemble.experiment_id]",
+        cascade="all, delete-orphan",
+    )
     observations = relationship(
-        "Observation", foreign_keys="[Observation.experiment_id]"
+        "Observation",
+        foreign_keys="[Observation.experiment_id]",
+        cascade="all, delete-orphan",
     )
 
 
@@ -102,8 +111,8 @@ class Record(Base, MetadataField):
     file_id = sa.Column(sa.Integer, sa.ForeignKey("file.id"))
     f64_matrix_id = sa.Column(sa.Integer, sa.ForeignKey("f64_matrix.id"))
 
-    file = relationship("File")
-    f64_matrix = relationship("F64Matrix")
+    file = relationship("File", cascade="all")
+    f64_matrix = relationship("F64Matrix", cascade="all")
     ensemble_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
     ensemble = relationship("Ensemble", back_populates="records")
     observations = relationship(
@@ -247,4 +256,5 @@ class Update(Base):
     observation_transformations = relationship(
         "ObservationTransformation",
         foreign_keys="[ObservationTransformation.update_id]",
+        cascade="all, delete-orphan",
     )

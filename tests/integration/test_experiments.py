@@ -1,3 +1,7 @@
+import numpy as np
+import pytest
+
+
 def test_list(client, create_experiment):
 
     expected_experiments = {"test1", "test2", "test3"}
@@ -32,3 +36,49 @@ def test_ensembles(client, create_experiment, create_ensemble):
     # The list of ensembles belonging to the newly created experiment matches
     resp = client.get_check(f"/experiments/{experiment_id}/ensembles")
     assert ids == {ens["id"] for ens in resp.json()}
+
+
+def test_delete_experiment(client, create_experiment, create_ensemble):
+    experiment_id = create_experiment("1")
+
+    ensemble_id = create_ensemble(experiment_id, ["param1", "param2"])
+    matrix = np.random.rand(5, 8, 13)
+
+    # POST
+    post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
+    resp = client.post_check(post_url, json=matrix.tolist())
+    OBSERVATIONS = {
+        "OBS1": {
+            "values": [1, 2, 3],
+            "errors": [0.1, 0.2, 0.3],
+            "x_axis": ["0", "1", "2"],
+        },
+        "OBS2": {
+            "values": [2, 4, 3],
+            "errors": [0.9, 0.2, 0.3],
+            "x_axis": ["2", "3", "4"],
+        },
+        "OBS3": {
+            "values": [1, 4, 5],
+            "errors": [0.1, 0.5, 0.2],
+            "x_axis": ["5", "6", "7"],
+        },
+    }
+    for name, obs in OBSERVATIONS.items():
+        client.post_check(
+            f"/experiments/{experiment_id}/observations",
+            json=dict(
+                name=name,
+                values=obs["values"],
+                errors=obs["errors"],
+                x_axis=obs["x_axis"],
+            ),
+        )
+    obsertvations = client.get_check(
+        f"/experiments/{experiment_id}/observations"
+    ).json()
+    resp = client.delete_check(f"/experiments/{experiment_id}")
+    assert len(client.get_check(f"/experiments").json()) == 0
+    for obs in obsertvations:
+        with pytest.raises(AssertionError):
+            client.get_check(f"/observations/{obs['id']}")
