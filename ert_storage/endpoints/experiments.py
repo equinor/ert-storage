@@ -93,3 +93,10 @@ async def get_experiment_metadata(
     """
     experiment = db.query(ds.Experiment).get(experiment_id)
     return experiment.metadata_dict
+
+
+@router.delete("/experiments/{experiment_id}")
+def delete_experiment(*, db: Session = Depends(get_db), experiment_id: int) -> None:
+    experiment = db.query(ds.Experiment).get(experiment_id)
+    db.delete(experiment)
+    db.commit()
