@@ -33,7 +33,7 @@ class CreateEnsemble(SQLAlchemyMutation):
         db = get_session(info.context)
 
         if experiment_id is not None:
-            experiment = db.query(ds.Experiment).get(experiment_id)
+            experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
         elif hasattr(root, "id"):
             experiment = root
         else:

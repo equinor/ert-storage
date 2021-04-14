@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -8,13 +9,13 @@ class _Ensemble(BaseModel):
 
 class EnsembleIn(_Ensemble):
     parameters: List[str]
-    update_id: Optional[int] = None
+    update_id: Optional[UUID] = None
 
 
 class EnsembleOut(_Ensemble):
-    id: int
-    children: List[int]
-    parent: Optional[int] = None
+    id: UUID
+    children: List[UUID]
+    parent: Optional[UUID] = None
 
     class Config:
         orm_mode = True

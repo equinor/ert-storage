@@ -12,31 +12,34 @@ def create_update(
     update: js.UpdateIn,
 ) -> js.UpdateOut:
 
+    ensemble = db.query(ds.Ensemble).filter_by(id=update.ensemble_reference_id).one()
     update_obj = ds.Update(
         algorithm=update.algorithm,
-        ensemble_reference_id=update.ensemble_reference_id,
+        ensemble_reference_pk=ensemble.pk,
     )
     db.add(update_obj)
-    transformations = (
-        update.observation_transformations if update.observation_transformations else []
-    )
-    observation_ids = [trans.observation_id for trans in transformations]
-    observations = (
-        db.query(ds.Observation).filter(ds.Observation.id.in_(observation_ids)).all()
-    )
 
-    observation_transformations = [
-        ds.ObservationTransformation(
-            active_list=observation_transformation.active,
-            scale_list=observation_transformation.scale,
-            observation=observation,
-            update=update_obj,
-        )
-        for observation_transformation, observation in zip(
-            transformations, observations
-        )
-    ]
+    if update.observation_transformations:
+        transformations = {t.name: t for t in update.observation_transformations}
 
-    db.add_all(observation_transformations)
+        observation_ids = [t.observation_id for t in transformations.values()]
+        observations = (
+            db.query(ds.Observation)
+            .filter(ds.Observation.id.in_(observation_ids))
+            .all()
+        )
+
+        observation_transformations = [
+            ds.ObservationTransformation(
+                active_list=transformations[observation.name].active,
+                scale_list=transformations[observation.name].scale,
+                observation=observation,
+                update=update_obj,
+            )
+            for observation in observations
+        ]
+
+        db.add_all(observation_transformations)
+
     db.commit()
     return update_obj

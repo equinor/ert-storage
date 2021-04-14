@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm.attributes import flag_modified
 from ert_storage.database import Session, get_db
@@ -9,33 +11,33 @@ router = APIRouter(tags=["ensemble"])
 
 @router.post("/experiments/{experiment_id}/ensembles", response_model=js.EnsembleOut)
 def post_ensemble(
-    *, db: Session = Depends(get_db), ens_in: js.EnsembleIn, experiment_id: int
+    *, db: Session = Depends(get_db), ens_in: js.EnsembleIn, experiment_id: UUID
 ) -> js.EnsembleOut:
 
-    experiment = db.query(ds.Experiment).get(experiment_id)
+    experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
     ens = ds.Ensemble(inputs=ens_in.parameters, experiment=experiment)
     db.add(ens)
 
     if ens_in.update_id:
-        update_obj = db.query(ds.Update).get(ens_in.update_id)
+        update_obj = db.query(ds.Update).filter_by(id=ens_in.update_id).one()
         update_obj.ensemble_result = ens
     db.commit()
 
     return js.EnsembleOut(
         id=ens.id,
-        children=[child.ensemble_result_id for child in ens.children],
-        parent=ens.parent.ensemble_reference_id if ens.parent else None,
+        children=[child.ensemble_result.id for child in ens.children],
+        parent=ens.parent.ensemble_reference.id if ens.parent else None,
     )
 
 
 @router.get("/ensembles/{ensemble_id}", response_model=js.EnsembleOut)
-def get_ensemble(*, db: Session = Depends(get_db), ensemble_id: int) -> js.EnsembleOut:
-    ens = db.query(ds.Ensemble).get(ensemble_id)
+def get_ensemble(*, db: Session = Depends(get_db), ensemble_id: UUID) -> js.EnsembleOut:
+    ens = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
     return js.EnsembleOut(
         id=ens.id,
-        children=[child.ensemble_result_id for child in ens.children],
-        parent=ens.parent.ensemble_reference_id if ens.parent else None,
+        children=[child.ensemble_result.id for child in ens.children],
+        parent=ens.parent.ensemble_reference.id if ens.parent else None,
     )
 
 
@@ -43,7 +45,7 @@ def get_ensemble(*, db: Session = Depends(get_db), ensemble_id: int) -> js.Ensem
 async def replace_ensemble_metadata(
     *,
     db: Session = Depends(get_db),
-    ensemble_id: int,
+    ensemble_id: UUID,
     body: Any = Body(...),
 ) -> None:
     """
@@ -58,7 +60,7 @@ async def replace_ensemble_metadata(
 async def patch_ensemble_metadata(
     *,
     db: Session = Depends(get_db),
-    ensemble_id: int,
+    ensemble_id: UUID,
     body: Any = Body(...),
 ) -> None:
     """
@@ -74,7 +76,7 @@ async def patch_ensemble_metadata(
 async def get_ensemble_metadata(
     *,
     db: Session = Depends(get_db),
-    ensemble_id: int,
+    ensemble_id: UUID,
 ) -> Mapping[str, Any]:
     """
     Get metadata json

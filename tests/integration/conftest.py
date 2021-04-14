@@ -103,7 +103,7 @@ def create_ensemble(client):
             f"/experiments/{experiment_id}/ensembles",
             json={"parameters": parameters, "update_id": update_id},
         )
-        return resp.json()["id"]
+        return str(resp.json()["id"])
 
     return func
 
@@ -112,7 +112,7 @@ def create_ensemble(client):
 def create_experiment(client):
     def func(name):
         resp = client.post_check("/experiments", json={"name": name})
-        return resp.json()["id"]
+        return str(resp.json()["id"])
 
     return func
 

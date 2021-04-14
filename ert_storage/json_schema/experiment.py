@@ -1,4 +1,5 @@
-from typing import List, Mapping, Optional, Any
+from uuid import UUID
+from typing import List, Mapping, Any
 from pydantic import BaseModel
 
 
@@ -11,8 +12,8 @@ class ExperimentIn(_Experiment):
 
 
 class ExperimentOut(_Experiment):
-    id: int
-    ensembles: List[int]
+    id: UUID
+    ensembles: List[UUID]
     metadata: Mapping[str, Any] = {}
 
     class Config:

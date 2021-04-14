@@ -12,6 +12,10 @@ import sqlalchemy as sa
 
 from ert_storage.database import IS_POSTGRES
 
+import graphene
+from graphene_sqlalchemy.converter import convert_sqlalchemy_type
+from graphene_sqlalchemy.registry import Registry
+
 
 __all__ = ["FloatArray", "StringArray"]
 
@@ -26,10 +30,6 @@ if IS_POSTGRES:
 else:
     FloatArray = type("FloatArray", (sa.PickleType,), dict(sa.PickleType.__dict__))
     StringArray = type("StringArray", (sa.PickleType,), dict(sa.PickleType.__dict__))
-
-    import graphene
-    from graphene_sqlalchemy.converter import convert_sqlalchemy_type
-    from graphene_sqlalchemy.registry import Registry
 
     @convert_sqlalchemy_type.register(StringArray)
     def convert_column_to_string_array(

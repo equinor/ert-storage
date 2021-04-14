@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel
 from typing import List, Union, Optional
 from .observation import (
@@ -7,8 +9,8 @@ from .observation import (
 
 class _Update(BaseModel):
     algorithm: str
-    ensemble_result_id: Union[int, None]
-    ensemble_reference_id: Union[int, None]
+    ensemble_result_id: Union[UUID, None]
+    ensemble_reference_id: Union[UUID, None]
 
 
 class UpdateIn(_Update):
@@ -16,7 +18,7 @@ class UpdateIn(_Update):
 
 
 class UpdateOut(_Update):
-    id: int
+    id: UUID
 
     class Config:
         orm_mode = True
