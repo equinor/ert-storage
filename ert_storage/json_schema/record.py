@@ -1,4 +1,5 @@
-from typing import List, Any, Optional, Mapping
+from uuid import UUID
+from typing import Any, Mapping
 from pydantic import BaseModel
 
 
@@ -7,7 +8,7 @@ class _Record(BaseModel):
 
 
 class RecordOut(_Record):
-    id: int
+    id: UUID
     name: str
     data: Any
     metadata: Mapping[str, Any]

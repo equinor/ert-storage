@@ -7,14 +7,15 @@ output mirrors an SQLAlchemyObjectType. This allows us to create mutation that b
 from collections import OrderedDict
 from typing import Any, Type, Iterable, Callable, Optional, TYPE_CHECKING, Dict
 
-from graphene_sqlalchemy import SQLAlchemyObjectType
+from graphene_sqlalchemy import SQLAlchemyObjectType as _SQLAlchemyObjectType
 from graphene.types.mutation import MutationOptions
 from graphene.types.utils import yank_fields_from_attrs
 from graphene.types.interface import Interface
 from graphene.utils.get_unbound_function import get_unbound_function
 from graphene.utils.props import props
 from graphene.types.objecttype import ObjectTypeOptions
-from graphene import Field, Interface
+from graphene import ObjectType, Field, Interface
+from graphql import ResolveInfo
 
 
 __all__ = ["SQLAlchemyObjectType", "SQLAlchemyMutation"]
@@ -23,6 +24,14 @@ __all__ = ["SQLAlchemyObjectType", "SQLAlchemyMutation"]
 if TYPE_CHECKING:
     from graphene_sqlalchemy.types.argument import Argument
     import graphene.types.field
+
+
+class SQLAlchemyObjectType(_SQLAlchemyObjectType):
+    class Meta:
+        abstract = True
+
+    def resolve_id(self, info: ResolveInfo) -> str:
+        return str(self.id)
 
 
 class SQLAlchemyMutation(SQLAlchemyObjectType):

@@ -1,3 +1,5 @@
+from uuid import UUID
+
 import ert_storage.json_schema as js
 
 
@@ -10,7 +12,7 @@ def _create_dummy_update_id(algorithm, ensemble_id, client, transformations=[]):
             observation_transformations=transformations,
         ),
     )
-    return js.UpdateOut.parse_obj(update_resp.json()).id
+    return str(js.UpdateOut.parse_obj(update_resp.json()).id)
 
 
 def _get_ensemble(client, ensemble_id) -> js.EnsembleOut:
@@ -34,7 +36,7 @@ def test_ensemble_parent_child_link(client, simple_ensemble):
     assert ens_0.parent is None
     assert ens_1.parent == ens_0.id
     assert ens_2.parent == ens_0.id
-    assert set(ens_0.children) == {ensemble_1_id, ensemble_2_id}
+    assert set(ens_0.children) == {UUID(ensemble_1_id), UUID(ensemble_2_id)}
 
 
 OBSERVATIONS = {

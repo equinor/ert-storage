@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm.attributes import flag_modified
 from ert_storage.database import Session, get_db
@@ -45,9 +46,9 @@ def post_experiments(
     "/experiments/{experiment_id}/ensembles", response_model=List[js.EnsembleOut]
 )
 def get_experiment_ensembles(
-    *, db: Session = Depends(get_db), experiment_id: int
+    *, db: Session = Depends(get_db), experiment_id: UUID
 ) -> List[js.EnsembleOut]:
-    experiment = db.query(ds.Experiment).get(experiment_id)
+    experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
     return experiment.ensembles
 
 
@@ -55,13 +56,13 @@ def get_experiment_ensembles(
 async def replace_experiment_metadata(
     *,
     db: Session = Depends(get_db),
-    experiment_id: int,
+    experiment_id: UUID,
     body: Any = Body(...),
 ) -> None:
     """
     Assign new metadata json
     """
-    experiment = db.query(ds.Experiment).get(experiment_id)
+    experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
     experiment._metadata = body
     db.commit()
 
@@ -70,13 +71,13 @@ async def replace_experiment_metadata(
 async def patch_experiment_metadata(
     *,
     db: Session = Depends(get_db),
-    experiment_id: int,
+    experiment_id: UUID,
     body: Any = Body(...),
 ) -> None:
     """
     Update metadata json
     """
-    experiment = db.query(ds.Experiment).get(experiment_id)
+    experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
     experiment._metadata.update(body)
     flag_modified(experiment, "_metadata")
     db.commit()
@@ -86,17 +87,17 @@ async def patch_experiment_metadata(
 async def get_experiment_metadata(
     *,
     db: Session = Depends(get_db),
-    experiment_id: int,
+    experiment_id: UUID,
 ) -> Mapping[str, Any]:
     """
     Get metadata json
     """
-    experiment = db.query(ds.Experiment).get(experiment_id)
+    experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
     return experiment.metadata_dict
 
 
 @router.delete("/experiments/{experiment_id}")
-def delete_experiment(*, db: Session = Depends(get_db), experiment_id: int) -> None:
-    experiment = db.query(ds.Experiment).get(experiment_id)
+def delete_experiment(*, db: Session = Depends(get_db), experiment_id: UUID) -> None:
+    experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
     db.delete(experiment)
     db.commit()

@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import List, Optional, Any, Mapping
 from pydantic import BaseModel
 
@@ -6,7 +7,7 @@ class _ObservationTransformation(BaseModel):
     name: str
     active: List[bool]
     scale: List[float]
-    observation_id: int
+    observation_id: UUID
 
 
 class ObservationTransformationIn(_ObservationTransformation):
@@ -14,7 +15,7 @@ class ObservationTransformationIn(_ObservationTransformation):
 
 
 class ObservationTransformationOut(_ObservationTransformation):
-    id: int
+    id: UUID
 
     class Config:
         orm_mode = True
@@ -25,7 +26,7 @@ class _Observation(BaseModel):
     errors: List[float]
     values: List[float]
     x_axis: List[Any]
-    records: Optional[List[int]] = None
+    records: Optional[List[UUID]] = None
 
 
 class ObservationIn(_Observation):
@@ -33,7 +34,7 @@ class ObservationIn(_Observation):
 
 
 class ObservationOut(_Observation):
-    id: int
+    id: UUID
     transformation: Optional[ObservationTransformationOut] = None
     metadata: Mapping[str, Any] = {}
 

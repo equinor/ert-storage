@@ -1,13 +1,16 @@
 from enum import Enum
-from typing import Any, Mapping, Optional
+from typing import Any, Optional, Mapping
 
 import sqlalchemy as sa
+from uuid import uuid4
+
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from ert_storage.database import Base
 
 from ert_storage.ext.sqlalchemy_arrays import StringArray, FloatArray
+from ert_storage.ext.uuid import UUID
 
 
 class RecordType(Enum):
@@ -34,27 +37,28 @@ class MetadataField:
 class Ensemble(Base, MetadataField):
     __tablename__ = "ensemble"
 
-    id = sa.Column(sa.Integer, primary_key=True)
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
     inputs = sa.Column(StringArray)
     records = relationship(
-        "Record", foreign_keys="[Record.ensemble_id]", cascade="all, delete-orphan"
+        "Record", foreign_keys="[Record.ensemble_pk]", cascade="all, delete-orphan"
     )
-    experiment_id = sa.Column(
-        sa.Integer, sa.ForeignKey("experiment.id"), nullable=False
+    experiment_pk = sa.Column(
+        sa.Integer, sa.ForeignKey("experiment.pk"), nullable=False
     )
     experiment = relationship("Experiment", back_populates="ensembles")
     children = relationship(
         "Update",
-        foreign_keys="[Update.ensemble_reference_id]",
+        foreign_keys="[Update.ensemble_reference_pk]",
     )
     parent = relationship(
         "Update",
         uselist=False,
-        foreign_keys="[Update.ensemble_result_id]",
+        foreign_keys="[Update.ensemble_result_pk]",
         cascade="all, delete-orphan",
     )
 
@@ -62,7 +66,8 @@ class Ensemble(Base, MetadataField):
 class Experiment(Base, MetadataField):
     __tablename__ = "experiment"
 
-    id = sa.Column(sa.Integer, primary_key=True)
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -70,12 +75,12 @@ class Experiment(Base, MetadataField):
     name = sa.Column(sa.String)
     ensembles = relationship(
         "Ensemble",
-        foreign_keys="[Ensemble.experiment_id]",
+        foreign_keys="[Ensemble.experiment_pk]",
         cascade="all, delete-orphan",
     )
     observations = relationship(
         "Observation",
-        foreign_keys="[Observation.experiment_id]",
+        foreign_keys="[Observation.experiment_pk]",
         cascade="all, delete-orphan",
     )
 
@@ -83,8 +88,8 @@ class Experiment(Base, MetadataField):
 observation_record_association = sa.Table(
     "observation_record_association",
     Base.metadata,
-    sa.Column("observation_id", sa.Integer, sa.ForeignKey("observation.id")),
-    sa.Column("record_id", sa.Integer, sa.ForeignKey("record.id")),
+    sa.Column("observation_pk", sa.Integer, sa.ForeignKey("observation.pk")),
+    sa.Column("record_pk", sa.Integer, sa.ForeignKey("record.pk")),
 )
 
 
@@ -98,7 +103,8 @@ class Record(Base, MetadataField):
             kwargs.setdefault("_record_type", record_type.value)
         super().__init__(*args, **kwargs)
 
-    id = sa.Column(sa.Integer, primary_key=True)
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -108,12 +114,12 @@ class Record(Base, MetadataField):
     realization_index = sa.Column(sa.Integer, nullable=True)
     _record_type = sa.Column("record_type", sa.Integer, nullable=False)
 
-    file_id = sa.Column(sa.Integer, sa.ForeignKey("file.id"))
-    f64_matrix_id = sa.Column(sa.Integer, sa.ForeignKey("f64_matrix.id"))
+    file_pk = sa.Column(sa.Integer, sa.ForeignKey("file.pk"))
+    f64_matrix_pk = sa.Column(sa.Integer, sa.ForeignKey("f64_matrix.pk"))
 
     file = relationship("File", cascade="all")
     f64_matrix = relationship("F64Matrix", cascade="all")
-    ensemble_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
+    ensemble_pk = sa.Column(sa.Integer, sa.ForeignKey("ensemble.pk"), nullable=True)
     ensemble = relationship("Ensemble", back_populates="records")
     observations = relationship(
         "Observation",
@@ -145,7 +151,8 @@ class Record(Base, MetadataField):
 class File(Base):
     __tablename__ = "file"
 
-    id = sa.Column(sa.Integer, primary_key=True)
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -162,7 +169,8 @@ class File(Base):
 class F64Matrix(Base):
     __tablename__ = "f64_matrix"
 
-    id = sa.Column(sa.Integer, primary_key=True)
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -173,7 +181,9 @@ class F64Matrix(Base):
 
 class FileBlock(Base):
     __tablename__ = "file_block"
-    id = sa.Column(sa.Integer, primary_key=True)
+
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -182,7 +192,7 @@ class FileBlock(Base):
     block_index = sa.Column(sa.Integer, nullable=False)
     record_name = sa.Column(sa.String, nullable=False)
     realization_index = sa.Column(sa.Integer, nullable=True)
-    ensemble_id = sa.Column(sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True)
+    ensemble_pk = sa.Column(sa.Integer, sa.ForeignKey("ensemble.pk"), nullable=True)
     ensemble = relationship("Ensemble")
     content = sa.Column(sa.LargeBinary, nullable=True)
 
@@ -191,7 +201,8 @@ class Observation(Base, MetadataField):
     __tablename__ = "observation"
     __table_args__ = (sa.UniqueConstraint("name", name="uq_observation_name"),)
 
-    id = sa.Column(sa.Integer, primary_key=True)
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -206,55 +217,58 @@ class Observation(Base, MetadataField):
         secondary=observation_record_association,
         back_populates="observations",
     )
-    experiment_id = sa.Column(
-        sa.Integer, sa.ForeignKey("experiment.id"), nullable=False
+    experiment_pk = sa.Column(
+        sa.Integer, sa.ForeignKey("experiment.pk"), nullable=False
     )
     experiment = relationship("Experiment")
 
 
 class ObservationTransformation(Base):
     __tablename__ = "observation_transformation"
-    id = sa.Column(sa.Integer, primary_key=True)
+
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     active_list = sa.Column(sa.PickleType, nullable=False)
     scale_list = sa.Column(sa.PickleType, nullable=False)
 
-    observation_id = sa.Column(
-        sa.Integer, sa.ForeignKey("observation.id"), nullable=False
+    observation_pk = sa.Column(
+        sa.Integer, sa.ForeignKey("observation.pk"), nullable=False
     )
     observation = relationship("Observation")
 
-    update_id = sa.Column(sa.Integer, sa.ForeignKey("update.id"), nullable=False)
+    update_pk = sa.Column(sa.Integer, sa.ForeignKey("update.pk"), nullable=False)
     update = relationship("Update", back_populates="observation_transformations")
 
 
 class Update(Base):
     __tablename__ = "update"
     __table_args__ = (
-        sa.UniqueConstraint("ensemble_result_id", name="uq_update_result_id"),
+        sa.UniqueConstraint("ensemble_result_pk", name="uq_update_result_pk"),
     )
 
-    id = sa.Column(sa.Integer, primary_key=True)
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
     algorithm = sa.Column(sa.String, nullable=False)
-    ensemble_reference_id = sa.Column(
-        sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True
+    ensemble_reference_pk = sa.Column(
+        sa.Integer, sa.ForeignKey("ensemble.pk"), nullable=True
     )
-    ensemble_result_id = sa.Column(
-        sa.Integer, sa.ForeignKey("ensemble.id"), nullable=True
+    ensemble_result_pk = sa.Column(
+        sa.Integer, sa.ForeignKey("ensemble.pk"), nullable=True
     )
 
     ensemble_reference = relationship(
         "Ensemble",
-        foreign_keys=[ensemble_reference_id],
+        foreign_keys=[ensemble_reference_pk],
         back_populates="children",
     )
     ensemble_result = relationship(
         "Ensemble",
-        foreign_keys=[ensemble_result_id],
+        foreign_keys=[ensemble_result_pk],
         uselist=False,
         back_populates="parent",
     )
     observation_transformations = relationship(
         "ObservationTransformation",
-        foreign_keys="[ObservationTransformation.update_id]",
+        foreign_keys="[ObservationTransformation.update_pk]",
         cascade="all, delete-orphan",
     )
