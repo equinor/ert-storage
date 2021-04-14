@@ -350,9 +350,9 @@ async def post_record_observations(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
-                "error": f"Problem with linking observations {observation_ids} to record {name}!",
+                "error": f"Observations {observation_ids} not found!",
                 "name": name,
-                "ensemble_id": ensemble_id,
+                "ensemble_id": str(ensemble_id),
             },
         )
 
