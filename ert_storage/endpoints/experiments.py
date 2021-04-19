@@ -19,6 +19,7 @@ def get_experiments(
             id=exp.id,
             name=exp.name,
             ensembles=[ens.id for ens in exp.ensembles],
+            priors={pri.name: pri.id for pri in exp.priors},
             metadata=exp.metadata_dict,
         )
         for exp in db.query(ds.Experiment).all()
@@ -32,12 +33,26 @@ def post_experiments(
     ens_in: js.ExperimentIn,
 ) -> js.ExperimentOut:
     experiment = ds.Experiment(name=ens_in.name)
+
+    if ens_in.priors:
+        db.add_all(
+            ds.Prior(
+                function=ds.PriorFunction.__members__[prior.function],
+                experiment=experiment,
+                name=name,
+                argument_names=[x[0] for x in prior if isinstance(x[1], float)],
+                argument_values=[x[1] for x in prior if isinstance(x[1], float)],
+            )
+            for name, prior in ens_in.priors.items()
+        )
+
     db.add(experiment)
     db.commit()
     return js.ExperimentOut(
         id=experiment.id,
         name=experiment.name,
         ensembles=[ens.id for ens in experiment.ensembles],
+        priors={pri.name: pri.id for pri in experiment.priors},
         metadata=experiment.metadata_dict,
     )
 

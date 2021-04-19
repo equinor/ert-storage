@@ -1,4 +1,4 @@
-from typing import List, Optional, TYPE_CHECKING
+from typing import Iterable, List, Optional, TYPE_CHECKING
 import graphene as gr
 from graphene_sqlalchemy.utils import get_session
 
@@ -14,6 +14,29 @@ if TYPE_CHECKING:
 class Ensemble(SQLAlchemyObjectType):
     class Meta:
         model = ds.Ensemble
+
+    child_ensembles = gr.List(lambda: Ensemble)
+    parent_ensemble = gr.Field(lambda: Ensemble)
+    responses = gr.Field("ert_storage.graphql.responses.Response")
+    parameters = gr.List("ert_storage.graphql.parameters.Parameter")
+
+    def resolve_child_ensembles(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> List[ds.Ensemble]:
+        return [x.ensemble_result for x in root.children]
+
+    def resolve_parent_ensemble(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> Optional[ds.Ensemble]:
+        update = root.parent
+        if update is not None:
+            return update.ensemble_reference
+        return None
+
+    def resolve_parameters(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> Iterable[ds.Prior]:
+        return root.parameters
 
 
 class CreateEnsemble(SQLAlchemyMutation):

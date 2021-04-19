@@ -201,7 +201,9 @@ async def finalize_blob(
         record_obj.file.content = data
 
 
-@router.post("/ensembles/{ensemble_id}/records/{name}/matrix")
+@router.post(
+    "/ensembles/{ensemble_id}/records/{name}/matrix", response_model=js.RecordOut
+)
 async def post_ensemble_record_matrix(
     *,
     db: Session = Depends(get_db),
@@ -209,14 +211,36 @@ async def post_ensemble_record_matrix(
     name: str,
     realization_index: Optional[int] = None,
     content_type: str = Header("application/json"),
-    request: Request,
     record_class: Optional[str] = None,
-) -> None:
+    prior_id: Optional[UUID] = None,
+    request: Request,
+) -> js.RecordOut:
     """
     Assign an n-dimensional float matrix, encoded in JSON, to the given `name` record.
     """
+    if prior_id is not None and record_class != "parameter":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": "Priors can only be specified for parameter records",
+                "name": name,
+                "ensemble_id": str(ensemble_id),
+                "realization_index": realization_index,
+                "prior_id": str(prior_id),
+            },
+        )
     ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
     labels = None
+    prior = (
+        (
+            db.query(ds.Prior)
+            .filter_by(id=prior_id, experiment_pk=ensemble.experiment_pk)
+            .one()
+        )
+        if prior_id
+        else None
+    )
+
     try:
         if content_type == "application/json":
             content = np.array(await request.json(), dtype=np.float64)
@@ -263,9 +287,12 @@ async def post_ensemble_record_matrix(
         f64_matrix=matrix_obj,
         realization_index=realization_index,
         record_class=record_class_enum,
+        prior=prior,
     )
     record_obj.ensemble = ensemble
     db.add(record_obj)
+    db.commit()
+    return record_obj
 
 
 @router.put("/ensembles/{ensemble_id}/records/{name}/metadata")
@@ -417,54 +444,59 @@ async def get_ensemble_record(
         bundle = _get_ensemble_record(db, ensemble_id, name)
     else:
         bundle = _get_forward_model_record(db, ensemble_id, name, realization_index)
+    return await _get_record_data(bundle, accept)
 
-    type_ = bundle.record_type
-    if type_ == ds.RecordType.float_vector:
-        if accept == "application/x-numpy":
-            from numpy.lib.format import write_array
 
-            stream = io.BytesIO()
-            write_array(stream, np.array(bundle.f64_matrix.content))
+@router.get("/ensembles/{ensemble_id}/parameters", response_model=List[str])
+async def get_ensemble_parameters(
+    *, db: Session = Depends(get_db), ensemble_id: UUID
+) -> List[str]:
+    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+    return ensemble.inputs
 
-            return Response(
-                content=stream.getvalue(),
-                media_type="application/x-numpy",
-            )
-        if accept == "application/x-dataframe":
-            import pandas as pd
 
-            data = pd.DataFrame(bundle.f64_matrix.content)
-            labels = bundle.f64_matrix.labels
-            if labels is not None:
-                data.columns = labels[0]
-                data.index = labels[1]
-            return Response(
-                content=data.to_csv().encode(),
-                media_type="application/x-dataframe",
-            )
-        else:
-            return bundle.f64_matrix.content
-    if type_ == ds.RecordType.file:
-        f = bundle.file
-        if f.content is not None:
-            return Response(
-                content=f.content,
-                media_type=f.mimetype,
-                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
-            )
-        elif f.az_container is not None and f.az_blob is not None:
-            blob = azure_blob_container.get_blob_client(f.az_blob)
-            download = await blob.download_blob()
+@router.get(
+    "/ensembles/{ensemble_id}/records", response_model=Mapping[str, js.RecordOut]
+)
+async def get_ensemble_records(
+    *, db: Session = Depends(get_db), ensemble_id: UUID
+) -> Mapping[str, js.RecordOut]:
+    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+    return {
+        rec.name: js.RecordOut(id=rec.id, name=rec.name, metadata=rec.metadata_dict)
+        for rec in ensemble.records
+    }
 
-            async def chunk_generator() -> AsyncGenerator[bytes, None]:
-                async for chunk in download.chunks():
-                    yield chunk
 
-            return StreamingResponse(
-                chunk_generator(),
-                media_type=f.mimetype,
-                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
-            )
+@router.get("/records/{record_id}", response_model=js.RecordOut)
+async def get_record(*, db: Session = Depends(get_db), record_id: UUID) -> js.RecordOut:
+    rec = db.query(ds.Record).filter_by(id=record_id).one()
+    return js.RecordOut(id=rec.id, name=rec.name, metadata=rec.metadata_dict)
+
+
+@router.get("/records/{record_id}/data")
+async def get_record_data(
+    *,
+    db: Session = Depends(get_db),
+    record_id: UUID,
+    accept: Optional[str] = Header(default="application/json"),
+) -> Any:
+    record = db.query(ds.Record).filter_by(id=record_id).one()
+    return await _get_record_data(record, accept)
+
+
+@router.get(
+    "/ensembles/{ensemble_id}/responses", response_model=Mapping[str, js.RecordOut]
+)
+def get_ensemble_responses(
+    *, db: Session = Depends(get_db), ensemble_id: UUID
+) -> Mapping[str, js.RecordOut]:
+    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+    return {
+        rec.name: js.RecordOut(id=rec.id, name=rec.name, metadata=rec.metadata_dict)
+        for rec in ensemble.records
+        if rec.record_class == ds.RecordClass.response
+    }
 
 
 def _get_ensemble_record(db: Session, ensemble_id: UUID, name: str) -> ds.Record:
@@ -547,48 +579,52 @@ def _get_and_assert_ensemble(
     return ensemble
 
 
-@router.get("/ensembles/{ensemble_id}/parameters", response_model=List[str])
-def get_ensemble_parameters(
-    *, db: Session = Depends(get_db), ensemble_id: UUID
-) -> List[str]:
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    return ensemble.inputs
+async def _get_record_data(record: ds.Record, accept: Optional[str]) -> Response:
+    type_ = record.record_type
+    if type_ == ds.RecordType.float_vector:
+        if accept == "application/x-numpy":
+            from numpy.lib.format import write_array
 
+            stream = io.BytesIO()
+            write_array(stream, np.array(record.f64_matrix.content))
 
-@router.get(
-    "/ensembles/{ensemble_id}/records", response_model=Mapping[str, js.RecordOut]
-)
-def get_ensemble_records(
-    *, db: Session = Depends(get_db), ensemble_id: UUID
-) -> Mapping[str, js.RecordOut]:
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    return {
-        rec.name: js.RecordOut(
-            id=rec.id, name=rec.name, data=rec.data, metadata=rec.metadata_dict
-        )
-        for rec in ensemble.records
-    }
+            return Response(
+                content=stream.getvalue(),
+                media_type="application/x-numpy",
+            )
+        if accept == "application/x-dataframe":
+            data = pd.DataFrame(record.f64_matrix.content)
+            labels = record.f64_matrix.labels
+            if labels is not None:
+                data.columns = labels[0]
+                data.index = labels[1]
+            return Response(
+                content=data.to_csv().encode(),
+                media_type="application/x-dataframe",
+            )
+        else:
+            return record.f64_matrix.content
+    if type_ == ds.RecordType.file:
+        f = record.file
+        if f.content is not None:
+            return Response(
+                content=f.content,
+                media_type=f.mimetype,
+                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
+            )
+        elif f.az_container is not None and f.az_blob is not None:
+            blob = azure_blob_container.get_blob_client(f.az_blob)
+            download = await blob.download_blob()
 
+            async def chunk_generator() -> AsyncGenerator[bytes, None]:
+                async for chunk in download.chunks():
+                    yield chunk
 
-@router.get("/records/{record_id}", response_model=js.RecordOut)
-def get_record(*, db: Session = Depends(get_db), record_id: UUID) -> js.RecordOut:
-    rec = db.query(ds.Record).filter_by(id=record_id).one()
-    return js.RecordOut(
-        id=rec.id, name=rec.name, data=rec.data, metadata=rec.metadata_dict
+            return StreamingResponse(
+                chunk_generator(),
+                media_type=f.mimetype,
+                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
+            )
+    raise NotImplementedError(
+        f"Getting record data for type {type_} and Accept header {accept} not implemented"
     )
-
-
-@router.get(
-    "/ensembles/{ensemble_id}/responses", response_model=Mapping[str, js.RecordOut]
-)
-def get_ensemble_responses(
-    *, db: Session = Depends(get_db), ensemble_id: UUID
-) -> Mapping[str, js.RecordOut]:
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    return {
-        rec.name: js.RecordOut(
-            id=rec.id, name=rec.name, data=rec.data, metadata=rec.metadata_dict
-        )
-        for rec in ensemble.records
-        if rec.record_class == ds.RecordClass.response
-    }
