@@ -10,8 +10,7 @@ class _Record(BaseModel):
 class RecordOut(_Record):
     id: UUID
     name: str
-    data: Any
-    metadata: Mapping[str, Any]
+    _metadata: Mapping[str, Any]
 
     class Config:
         orm_mode = True

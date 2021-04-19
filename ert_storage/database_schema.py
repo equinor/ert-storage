@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Optional, Mapping
+from typing import Any, Optional, Mapping, Iterable
 
 import sqlalchemy as sa
 from uuid import uuid4
@@ -24,6 +24,20 @@ class RecordClass(Enum):
     other = 3
 
 
+class PriorFunction(Enum):
+    const = 1
+    trig = 2
+    normal = 3
+    lognormal = 4
+    truncnormal = 5
+    stdnormal = 6
+    uniform = 7
+    duniform = 8
+    loguniform = 9
+    erf = 10
+    derf = 11
+
+
 class MetadataField:
     _metadata = sa.Column("metadata", sa.JSON, nullable=True)
 
@@ -45,7 +59,10 @@ class Ensemble(Base, MetadataField):
     )
     inputs = sa.Column(StringArray)
     records = relationship(
-        "Record", foreign_keys="[Record.ensemble_pk]", cascade="all, delete-orphan"
+        "Record",
+        foreign_keys="[Record.ensemble_pk]",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
     )
     experiment_pk = sa.Column(
         sa.Integer, sa.ForeignKey("experiment.pk"), nullable=False
@@ -61,6 +78,10 @@ class Ensemble(Base, MetadataField):
         foreign_keys="[Update.ensemble_result_pk]",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def parameters(self) -> Iterable["Record"]:
+        return self.records.filter_by(record_class=RecordClass.parameter)
 
 
 class Experiment(Base, MetadataField):
@@ -83,6 +104,11 @@ class Experiment(Base, MetadataField):
         foreign_keys="[Observation.experiment_pk]",
         cascade="all, delete-orphan",
     )
+    priors = relationship(
+        "Prior",
+        foreign_keys="[Prior.experiment_pk]",
+        cascade="all, delete-orphan",
+    )
 
 
 observation_record_association = sa.Table(
@@ -91,6 +117,28 @@ observation_record_association = sa.Table(
     sa.Column("observation_pk", sa.Integer, sa.ForeignKey("observation.pk")),
     sa.Column("record_pk", sa.Integer, sa.ForeignKey("record.pk")),
 )
+
+
+class Prior(Base, MetadataField):
+    __tablename__ = "prior"
+
+    pk = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(UUID, unique=True, default=uuid4)
+    time_created = sa.Column(sa.DateTime, server_default=func.now())
+    time_updated = sa.Column(
+        sa.DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    name = sa.Column(sa.String, nullable=False)
+    function = sa.Column(sa.Enum(PriorFunction), nullable=False)
+    argument_names = sa.Column(StringArray, nullable=False)
+    argument_values = sa.Column(FloatArray, nullable=False)
+
+    experiment_pk = sa.Column(
+        sa.Integer, sa.ForeignKey("experiment.pk"), nullable=False
+    )
+    experiment = relationship("Experiment")
+    parameters = relationship("Record", foreign_keys="[Record.prior_pk]")
 
 
 class Record(Base, MetadataField):
@@ -127,6 +175,9 @@ class Record(Base, MetadataField):
         back_populates="records",
     )
     record_class = sa.Column(sa.Enum(RecordClass))
+
+    prior_pk = sa.Column(sa.Integer, sa.ForeignKey("prior.pk"), nullable=True)
+    prior = relationship("Prior")
 
     @property
     def record_type(self) -> RecordType:

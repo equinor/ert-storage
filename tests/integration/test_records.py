@@ -307,5 +307,5 @@ def test_responses(client, simple_ensemble):
 
     responses = client.get(f"/ensembles/{ensemble_id}/responses").json()
     assert len(responses) == 1
-    assert "rec3" in responses
-    assert responses["rec3"]["data"] == [[1, 2], [4, 5]]
+    data = client.get(f"/records/{responses['rec3']['id']}/data").json()
+    assert data == [[1, 2], [4, 5]]

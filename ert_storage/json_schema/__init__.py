@@ -8,3 +8,4 @@ from .observation import (
     ObservationTransformationOut,
 )
 from .update import UpdateIn, UpdateOut
+from .prior import Prior
