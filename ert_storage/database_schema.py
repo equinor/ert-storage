@@ -38,7 +38,7 @@ class Ensemble(Base, MetadataField):
     __tablename__ = "ensemble"
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -67,7 +67,7 @@ class Experiment(Base, MetadataField):
     __tablename__ = "experiment"
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -104,7 +104,7 @@ class Record(Base, MetadataField):
         super().__init__(*args, **kwargs)
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -152,7 +152,7 @@ class File(Base):
     __tablename__ = "file"
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -170,7 +170,7 @@ class F64Matrix(Base):
     __tablename__ = "f64_matrix"
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -183,7 +183,7 @@ class FileBlock(Base):
     __tablename__ = "file_block"
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -202,7 +202,7 @@ class Observation(Base, MetadataField):
     __table_args__ = (sa.UniqueConstraint("name", name="uq_observation_name"),)
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
@@ -227,7 +227,7 @@ class ObservationTransformation(Base):
     __tablename__ = "observation_transformation"
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     active_list = sa.Column(sa.PickleType, nullable=False)
     scale_list = sa.Column(sa.PickleType, nullable=False)
 
@@ -247,7 +247,7 @@ class Update(Base):
     )
 
     pk = sa.Column(sa.Integer, primary_key=True)
-    id = sa.Column(UUID, unique=True, default=uuid4)
+    id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
     algorithm = sa.Column(sa.String, nullable=False)
     ensemble_reference_pk = sa.Column(
         sa.Integer, sa.ForeignKey("ensemble.pk"), nullable=True
