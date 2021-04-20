@@ -176,7 +176,7 @@ class F64Matrix(Base):
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
     content = sa.Column(FloatArray, nullable=False)
-    labels = sa.Column(StringArray)
+    labels = sa.Column(sa.PickleType)
 
 
 class FileBlock(Base):
@@ -199,7 +199,9 @@ class FileBlock(Base):
 
 class Observation(Base, MetadataField):
     __tablename__ = "observation"
-    __table_args__ = (sa.UniqueConstraint("name", name="uq_observation_name"),)
+    __table_args__ = (
+        sa.UniqueConstraint("name", "experiment_pk", name="uq_observation_name"),
+    )
 
     pk = sa.Column(sa.Integer, primary_key=True)
     id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
