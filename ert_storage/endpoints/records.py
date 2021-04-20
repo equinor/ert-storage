@@ -229,7 +229,10 @@ async def post_ensemble_record_matrix(
             stream = io.BytesIO(await request.body())
             df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
             content = df.values
-            labels = [list(df.columns.values), list(df.index.values)]
+            labels = [
+                [str(v) for v in df.columns.values],
+                [str(v) for v in df.index.values],
+            ]
         else:
             raise ValueError()
     except ValueError:
