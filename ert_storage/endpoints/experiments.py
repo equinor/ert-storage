@@ -49,7 +49,15 @@ def get_experiment_ensembles(
     *, db: Session = Depends(get_db), experiment_id: UUID
 ) -> List[js.EnsembleOut]:
     experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
-    return experiment.ensembles
+    return [
+        js.EnsembleOut(
+            id=ens.id,
+            children=[child.ensemble_result.id for child in ens.children],
+            parent=ens.parent.ensemble_reference.id if ens.parent else None,
+            experiment_id=ens.experiment.id,
+        )
+        for ens in experiment.ensembles
+    ]
 
 
 @router.put("/experiments/{experiment_id}/metadata")

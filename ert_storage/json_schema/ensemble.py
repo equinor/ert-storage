@@ -1,10 +1,10 @@
 from uuid import UUID
-from typing import List, Optional
+from typing import List, Optional, Any
 from pydantic import BaseModel
 
 
 class _Ensemble(BaseModel):
-    pass
+    metadata: Optional[Any]
 
 
 class EnsembleIn(_Ensemble):
@@ -16,6 +16,7 @@ class EnsembleOut(_Ensemble):
     id: UUID
     children: List[UUID]
     parent: Optional[UUID] = None
+    experiment_id: Optional[UUID] = None
 
     class Config:
         orm_mode = True
