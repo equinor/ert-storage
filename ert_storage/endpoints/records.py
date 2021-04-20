@@ -1,6 +1,7 @@
 from uuid import uuid4, UUID
 import io
 import numpy as np
+import pandas as pd
 from typing import Any, Mapping, Optional, List, AsyncGenerator
 import sqlalchemy as sa
 from fastapi import (
@@ -215,7 +216,7 @@ async def post_ensemble_record_matrix(
     Assign an n-dimensional float matrix, encoded in JSON, to the given `name` record.
     """
     ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
-
+    labels = None
     try:
         if content_type == "application/json":
             content = np.array(await request.json(), dtype=np.float64)
@@ -224,6 +225,11 @@ async def post_ensemble_record_matrix(
 
             stream = io.BytesIO(await request.body())
             content = read_array(stream)
+        elif content_type == "application/x-dataframe":
+            stream = io.BytesIO(await request.body())
+            df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+            content = df.values
+            labels = [list(df.columns.values), list(df.index.values)]
         else:
             raise ValueError()
     except ValueError:
@@ -242,9 +248,7 @@ async def post_ensemble_record_matrix(
             },
         )
 
-    matrix_obj = ds.F64Matrix(
-        content=content.tolist(),
-    )
+    matrix_obj = ds.F64Matrix(content=content.tolist(), labels=labels)
     db.add(matrix_obj)
     if not record_class:
         record_class_enum = ds.RecordClass.other
@@ -422,6 +426,18 @@ async def get_ensemble_record(
             return Response(
                 content=stream.getvalue(),
                 media_type="application/x-numpy",
+            )
+        if accept == "application/x-dataframe":
+            import pandas as pd
+
+            data = pd.DataFrame(bundle.f64_matrix.content)
+            labels = bundle.f64_matrix.labels
+            if labels is not None:
+                data.columns = labels[0]
+                data.index = labels[1]
+            return Response(
+                content=data.to_csv().encode(),
+                media_type="application/x-dataframe",
             )
         else:
             return bundle.f64_matrix.content
