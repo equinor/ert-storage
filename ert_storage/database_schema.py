@@ -175,7 +175,7 @@ class F64Matrix(Base):
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
-
+    labels = sa.Column(StringArray, nullable=True)
     content = sa.Column(FloatArray, nullable=False)
 
 

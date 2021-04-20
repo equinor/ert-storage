@@ -324,6 +324,61 @@ async def get_record_metadata(
     return bundle.metadata_dict
 
 
+@router.post("/ensembles/{ensemble_id}/records/{name}/labels")
+async def post_record_labels(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: UUID,
+    name: str,
+    realization_index: Optional[int] = None,
+    labels: List[List[str]] = Body(...),
+) -> None:
+
+    if realization_index is None:
+        record_obj = _get_ensemble_record(db, ensemble_id, name)
+    else:
+        record_obj = _get_forward_model_record(db, ensemble_id, name, realization_index)
+
+    if record_obj.record_type != ds.RecordType.float_vector:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": f"Only matrix axes have labels!",
+                "name": name,
+                "ensemble_id": str(ensemble_id),
+            },
+        )
+    record_obj.f64_matrix.labels = labels
+    flag_modified(record_obj.f64_matrix, "labels")
+    db.commit()
+
+
+@router.get("/ensembles/{ensemble_id}/records/{name}/labels")
+async def get_record_labels(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: UUID,
+    name: str,
+    realization_index: Optional[int] = None,
+) -> List[List[str]]:
+    if realization_index is None:
+        record_obj = _get_ensemble_record(db, ensemble_id, name)
+    else:
+        record_obj = _get_forward_model_record(db, ensemble_id, name, realization_index)
+    if record_obj.record_type != ds.RecordType.float_vector:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": f"Only matrix axes have labels!",
+                "name": name,
+                "ensemble_id": str(ensemble_id),
+            },
+        )
+    if record_obj.f64_matrix.labels is not None:
+        return record_obj.f64_matrix.labels
+    return []
+
+
 @router.post("/ensembles/{ensemble_id}/records/{name}/observations")
 async def post_record_observations(
     *,
