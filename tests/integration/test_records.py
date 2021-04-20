@@ -169,6 +169,42 @@ def test_ensemble_matrix_json(client, simple_ensemble, get, post):
         raise NotImplementedError()
 
 
+def test_ensemble_matrix_dataframe(client, simple_ensemble):
+    from numpy.testing import assert_array_equal
+
+    ensemble_id = simple_ensemble()
+    matrix = np.random.rand(8, 5)
+    labels = [
+        ["north", "south", "east", "west", "up"],
+        ["A", "B", "C", "D", "E", "F", "G", "H"],
+    ]
+    # POST
+    post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
+    import pandas as pd
+
+    data = pd.DataFrame(matrix)
+    data.columns = labels[0]
+    data.index = labels[1]
+    resp = client.post(
+        post_url,
+        data=data.to_csv().encode(),
+        headers={"content-type": "application/x-dataframe"},
+    )
+
+    # GET
+    get_url = f"/ensembles/{ensemble_id}/records/mat"
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/mat",
+        headers={"accept": "application/x-dataframe"},
+    )
+    stream = io.BytesIO(resp.content)
+    df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+
+    assert_array_equal(df.values, data.values)
+    assert_array_equal(df.columns.values, data.columns.values)
+    assert_array_equal(df.index.values, data.index.values)
+
+
 def test_ensemble_file(client, simple_ensemble):
     ensemble_id = simple_ensemble()
 

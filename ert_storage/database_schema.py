@@ -175,8 +175,8 @@ class F64Matrix(Base):
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
-
     content = sa.Column(FloatArray, nullable=False)
+    labels = sa.Column(StringArray)
 
 
 class FileBlock(Base):
