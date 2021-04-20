@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from ert_storage.database import Session, get_db
 from ert_storage import database_schema as ds, json_schema as js
+from uuid import UUID
 
 router = APIRouter(tags=["ensemble"])
 
@@ -42,4 +43,29 @@ def create_update(
         db.add_all(observation_transformations)
 
     db.commit()
-    return update_obj
+    return js.UpdateOut(
+        id=update_obj.id,
+        experiment_id=ensemble.experiment.id,
+        algorithm=update_obj.algorithm,
+        ensemble_reference_id=ensemble.id,
+    )
+
+
+@router.get("/updates/{update_id}", response_model=js.UpdateOut)
+def get_update(
+    *,
+    db: Session = Depends(get_db),
+    update_id: UUID,
+) -> js.UpdateOut:
+    update_obj = db.query(ds.Update).filter_by(id=update_id).one()
+    return js.UpdateOut(
+        id=update_obj.id,
+        experiment_id=update_obj.ensemble_reference.experiment.id,
+        algorithm=update_obj.algorithm,
+        ensemble_reference_id=update_obj.ensemble_reference.id
+        if update_obj.ensemble_reference is not None
+        else None,
+        ensemble_result_id=update_obj.ensemble_result.id
+        if update_obj.ensemble_result is not None
+        else None,
+    )

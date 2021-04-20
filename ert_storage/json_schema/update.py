@@ -19,6 +19,7 @@ class UpdateIn(_Update):
 
 class UpdateOut(_Update):
     id: UUID
+    experiment_id: UUID
 
     class Config:
         orm_mode = True
