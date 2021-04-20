@@ -75,9 +75,11 @@ def get_observations_with_transformation(
     ens = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
     experiment = ens.experiment
     update = ens.parent
-    transformations = {
-        trans.observation.name: trans for trans in update.observation_transformations
-    }
+    transformations = (
+        {trans.observation.name: trans for trans in update.observation_transformations}
+        if update is not None
+        else {}
+    )
 
     return [
         js.ObservationOut(
