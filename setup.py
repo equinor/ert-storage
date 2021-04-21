@@ -17,6 +17,7 @@ setup(
         "ert_storage.ext",
         "ert_storage.graphql",
         "ert_storage.json_schema",
+        "ert_storage.testing",
     ],
     package_data={
         "ert_storage._alembic": [
