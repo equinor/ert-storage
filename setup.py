@@ -37,13 +37,15 @@ setup(
         "postgres": [
             "psycopg2",
         ],
+        "azure": [
+            "aiohttp",
+            "azure-storage-blob",
+        ],
     },
     install_requires=[
-        "aiohttp",
         "alembic",
         "async-exit-stack; python_version < '3.7'",
         "async-generator; python_version < '3.7'",
-        "azure-storage-blob",
         "fastapi",
         "graphene",
         "graphene-sqlalchemy>=2.0",

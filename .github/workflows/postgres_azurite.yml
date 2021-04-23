@@ -47,7 +47,7 @@ jobs:
 
       - name: Install
         run: |
-          pip install -e .[test,postgres]
+          pip install -e .[test,postgres,azure]
 
       - name: Run tests
         run: |
