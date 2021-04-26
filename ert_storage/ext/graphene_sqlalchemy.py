@@ -119,7 +119,7 @@ class SQLAlchemyMutation(SQLAlchemyObjectType):
         required: bool = False,
         **kwargs: Any
     ) -> "graphene.types.field.Field":
-        """ Mount instance of mutation Field. """
+        """Mount instance of mutation Field."""
         return Field(
             cls,
             args=cls._meta.arguments,
