@@ -14,6 +14,8 @@ setup(
         "ert_storage._alembic.alembic",
         "ert_storage._alembic.alembic.versions",
         "ert_storage.endpoints",
+        "ert_storage.endpoints.compute",
+        "ert_storage.compute",
         "ert_storage.ext",
         "ert_storage.graphql",
         "ert_storage.json_schema",
