@@ -1,4 +1,6 @@
 import numpy as np
+import random
+
 from fastapi import status
 
 
@@ -36,6 +38,16 @@ def test_ensembles(client, create_experiment, create_ensemble):
     # The list of ensembles belonging to the newly created experiment matches
     resp = client.get(f"/experiments/{experiment_id}/ensembles")
     assert ids == {ens["id"] for ens in resp.json()}
+
+
+def test_ensemble_size(client, create_experiment, create_ensemble):
+    experiment_id = create_experiment("test_ensembles")
+
+    ensemble_size = random.randint(0, 1000)
+    ensemble_id = create_ensemble(experiment_id=experiment_id, size=ensemble_size)
+
+    resp = client.get(f"/ensembles/{ensemble_id}")
+    assert ensemble_size == resp.json()["size"]
 
 
 def test_delete_experiment(client, create_experiment, create_ensemble):

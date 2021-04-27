@@ -18,7 +18,7 @@ PARAMETERS = [
 
 
 def test_list(client, simple_ensemble):
-    ensemble_id = simple_ensemble()
+    ensemble_id = simple_ensemble(size=2)
 
     resp = client.get(f"/ensembles/{ensemble_id}/records")
     assert resp.json() == {}
@@ -38,8 +38,19 @@ def test_list(client, simple_ensemble):
     assert set(resp.json().keys()) == {"hello", "world", "foo"}
 
 
+def test_ensemble_size_out_of_bounds(client, simple_ensemble):
+    ensemble_id = simple_ensemble(size=1)
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/foo/file",
+        params=dict(realization_index=1),
+        files={"file": ("foo.bar", io.BytesIO(), "foo/bar")},
+        check_status_code=status.HTTP_417_EXPECTATION_FAILED,
+    )
+
+
 def test_parameters(client, simple_ensemble):
-    ensemble_id = simple_ensemble(["coeffs"])
+    ensemble_id = simple_ensemble(["coeffs"], size=5)
     client.post(
         f"/ensembles/{ensemble_id}/records/coeffs/matrix",
         data=f"{PARAMETERS}",
@@ -220,7 +231,7 @@ def test_ensemble_file(client, simple_ensemble):
 
 
 def test_forward_model_file(client, simple_ensemble):
-    ensemble_id = simple_ensemble()
+    ensemble_id = simple_ensemble(size=5)
 
     with open("/dev/urandom", "rb") as f:
         data_a = f.read(random.randint(2 ** 16, 2 ** 24))

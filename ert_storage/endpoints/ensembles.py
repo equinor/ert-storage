@@ -16,7 +16,10 @@ def post_ensemble(
 
     experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
     ens = ds.Ensemble(
-        inputs=ens_in.parameters, experiment=experiment, _metadata=ens_in.metadata
+        inputs=ens_in.parameters,
+        experiment=experiment,
+        size=ens_in.size,
+        _metadata=ens_in.metadata,
     )
     db.add(ens)
 
@@ -27,6 +30,7 @@ def post_ensemble(
 
     return js.EnsembleOut(
         id=ens.id,
+        size=ens.size,
         children=[child.ensemble_result.id for child in ens.children],
         parent=ens.parent.ensemble_reference.id if ens.parent else None,
     )
@@ -38,6 +42,7 @@ def get_ensemble(*, db: Session = Depends(get_db), ensemble_id: UUID) -> js.Ense
 
     return js.EnsembleOut(
         id=ens.id,
+        size=ens.size,
         children=[child.ensemble_result.id for child in ens.children],
         parent=ens.parent.ensemble_reference.id if ens.parent else None,
         experiment_id=ens.experiment.id,

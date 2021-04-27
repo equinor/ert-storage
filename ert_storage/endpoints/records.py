@@ -561,6 +561,19 @@ def _get_and_assert_ensemble(
 
     q = db.query(ds.Record).filter_by(ensemble_pk=ensemble.pk, name=name)
     if realization_index is not None:
+        if realization_index not in range(ensemble.size) and ensemble.size != -1:
+            raise HTTPException(
+                status_code=status.HTTP_417_EXPECTATION_FAILED,
+                detail={
+                    "error": f"Ensemble '{name}' ('{ensemble_id}') does have a 'size' "
+                    f"of {ensemble.size}. The posted record is targeting "
+                    f"'realization_index' {realization_index} which is out "
+                    f"of bounds.",
+                    "name": name,
+                    "ensemble_id": str(ensemble_id),
+                },
+            )
+
         q = q.filter(
             (ds.Record.realization_index == None)
             | (ds.Record.realization_index == realization_index)

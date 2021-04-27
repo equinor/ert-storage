@@ -11,12 +11,12 @@ def client(ert_storage_client):
 
 @pytest.fixture
 def create_ensemble(client):
-    def func(experiment_id, parameters=None, update_id=None):
+    def func(experiment_id, parameters=None, update_id=None, size=-1):
         if parameters is None:
             parameters = []
         resp = client.post(
             f"/experiments/{experiment_id}/ensembles",
-            json={"parameters": parameters, "update_id": update_id},
+            json={"parameters": parameters, "update_id": update_id, "size": size},
         )
         return str(resp.json()["id"])
 
@@ -34,9 +34,11 @@ def create_experiment(client):
 
 @pytest.fixture
 def simple_ensemble(create_ensemble, create_experiment, request):
-    def func(parameters=None, update_id=None):
+    def func(parameters=None, update_id=None, size=-1):
         exp_id = create_experiment(request.node.name)
-        ens_id = create_ensemble(exp_id, parameters=parameters, update_id=update_id)
+        ens_id = create_ensemble(
+            exp_id, parameters=parameters, update_id=update_id, size=size
+        )
         return ens_id
 
     return func
