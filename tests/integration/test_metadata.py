@@ -5,7 +5,9 @@ def post_ensemble(client):
     # generate an ensemble
     resp = client.post("/experiments", json={"name": "test_metadata"})
     exp_id = resp.json()["id"]
-    resp = client.post(f"/experiments/{exp_id}/ensembles", json={"parameters": []})
+    resp = client.post(
+        f"/experiments/{exp_id}/ensembles", json={"parameters": [], "size": 0}
+    )
     ens_id = resp.json()["id"]
     return f"/ensembles/{ens_id}"
 

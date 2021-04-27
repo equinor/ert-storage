@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class _Ensemble(BaseModel):
     metadata: Optional[Any]
+    size: int
 
 
 class EnsembleIn(_Ensemble):

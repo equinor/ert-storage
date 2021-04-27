@@ -34,10 +34,10 @@ mutation($name: String) {
 
 
 CREATE_EXPERIMENT_WITH_ENSEMBLE = """\
-mutation($name: String, $params: [String!]) {
+mutation($name: String, $size: Int!, $params: [String!]) {
   createExperiment(name: $name) {
     id
-    createEnsemble(parameters: $params) {
+    createEnsemble(size: $size, parameters: $params) {
       id
     }
   }
@@ -88,7 +88,7 @@ def test_create_experiment_with_ensemble(client):
     eparams = [rand_name() for _ in range(5)]
     r = client.gql_execute(
         CREATE_EXPERIMENT_WITH_ENSEMBLE,
-        variable_values={"name": ename, "params": eparams},
+        variable_values={"name": ename, "size": 0, "params": eparams},
     )
 
     eid = r["data"]["createExperiment"]["id"]

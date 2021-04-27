@@ -16,6 +16,7 @@ class Ensemble(Base, MetadataField):
 
     pk = sa.Column(sa.Integer, primary_key=True)
     id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
+    size = sa.Column(sa.Integer, nullable=False)
     time_created = sa.Column(sa.DateTime, server_default=func.now())
     time_updated = sa.Column(
         sa.DateTime, server_default=func.now(), onupdate=func.now()

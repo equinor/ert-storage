@@ -1,3 +1,4 @@
+import random
 import uuid
 
 
@@ -5,14 +6,15 @@ GET_ENSEMBLE = """\
 query($id: ID!) {
   ensemble(id: $id) {
     id
+    size
     inputs
   }
 }
 """
 
 CREATE_ENSEMBLE = """\
-mutation create($experimentId: ID!, $params: [String]) {
-  createEnsemble(experimentId: $experimentId, parameters: $params) {
+mutation create($experimentId: ID!, $size: Int!, $params: [String]) {
+  createEnsemble(experimentId: $experimentId, size: $size, parameters: $params) {
     id
   }
 }
@@ -31,9 +33,15 @@ def test_get_ensemble(client, simple_ensemble):
 def test_create_ensemble(client, create_experiment):
     experiment_id = create_experiment(rand_name())
     eparams = [rand_name() for _ in range(8)]
+
+    ensemble_size = ensemble_size = random.randint(0, 1000)
     r = client.gql_execute(
         CREATE_ENSEMBLE,
-        variable_values={"experimentId": experiment_id, "params": eparams},
+        variable_values={
+            "experimentId": experiment_id,
+            "size": ensemble_size,
+            "params": eparams,
+        },
     )
     eid = r["data"]["createEnsemble"]["id"]
 
@@ -41,6 +49,7 @@ def test_create_ensemble(client, create_experiment):
 
     assert r["data"]["ensemble"]["id"] == eid
     assert r["data"]["ensemble"]["inputs"] == eparams
+    assert r["data"]["ensemble"]["size"] == ensemble_size
 
 
 def rand_name():

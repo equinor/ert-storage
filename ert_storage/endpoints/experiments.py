@@ -67,6 +67,7 @@ def get_experiment_ensembles(
     return [
         js.EnsembleOut(
             id=ens.id,
+            size=ens.size,
             children=[child.ensemble_result.id for child in ens.children],
             parent=ens.parent.ensemble_reference.id if ens.parent else None,
             experiment_id=ens.experiment.id,
