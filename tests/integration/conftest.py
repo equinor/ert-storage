@@ -62,8 +62,10 @@ def make_lognormal_prior() -> prior.PriorLogNormal:
     return prior.PriorLogNormal(mean=random(), std=random())
 
 
-def make_truncnormal_prior() -> prior.PriorTruncNormal:
-    return prior.PriorTruncNormal(mean=random(), std=random())
+def make_truncnormal_prior() -> prior.PriorErtTruncNormal:
+    return prior.PriorErtTruncNormal(
+        mean=random(), std=random(), min=random(), max=random()
+    )
 
 
 def make_stdnormal_prior() -> prior.PriorStdNormal:
@@ -74,20 +76,24 @@ def make_uniform_prior() -> prior.PriorUniform:
     return prior.PriorUniform(min=random(), max=random())
 
 
-def make_duniform_prior() -> prior.PriorDUniform:
-    return prior.PriorDUniform(min=random(), max=random())
+def make_duniform_prior() -> prior.PriorErtDUniform:
+    return prior.PriorErtDUniform(bins=random(), min=random(), max=random())
 
 
 def make_loguniform_prior() -> prior.PriorLogUniform:
-    return prior.PriorDUniform(min=random(), max=random())
+    return prior.PriorLogUniform(min=random(), max=random())
 
 
-def make_erf_prior() -> prior.PriorErf:
-    return prior.PriorErf()
+def make_erf_prior() -> prior.PriorErtErf:
+    return prior.PriorErtErf(
+        min=random(), max=random(), skewness=random(), width=random()
+    )
 
 
-def make_derf_prior() -> prior.PriorDErf:
-    return prior.PriorDErf()
+def make_derf_prior() -> prior.PriorErtDErf:
+    return prior.PriorErtDErf(
+        bins=random(), min=random(), max=random(), skewness=random(), width=random()
+    )
 
 
 MAKE_PRIOR = [

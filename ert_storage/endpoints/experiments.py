@@ -40,8 +40,8 @@ def post_experiments(
                 function=ds.PriorFunction.__members__[prior.function],
                 experiment=experiment,
                 name=name,
-                argument_names=[x[0] for x in prior if isinstance(x[1], float)],
-                argument_values=[x[1] for x in prior if isinstance(x[1], float)],
+                argument_names=[x[0] for x in prior if isinstance(x[1], (float, int))],
+                argument_values=[x[1] for x in prior if isinstance(x[1], (float, int))],
             )
             for name, prior in ens_in.priors.items()
         )

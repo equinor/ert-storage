@@ -14,13 +14,13 @@ class PriorFunction(Enum):
     trig = 2
     normal = 3
     lognormal = 4
-    truncnormal = 5
+    ert_truncnormal = 5
     stdnormal = 6
     uniform = 7
-    duniform = 8
+    ert_duniform = 8
     loguniform = 9
-    erf = 10
-    derf = 11
+    ert_erf = 10
+    ert_derf = 11
 
 
 class Prior(Base, MetadataField):

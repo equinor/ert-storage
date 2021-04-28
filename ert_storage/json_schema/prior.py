@@ -48,14 +48,20 @@ class PriorLogNormal(BaseModel):
     std: float
 
 
-class PriorTruncNormal(BaseModel):
+class PriorErtTruncNormal(BaseModel):
     """
-    Truncated normal distribution parameter prior
+    ERT Truncated normal distribution parameter prior
+
+    ERT differs from the usual distribution by that it simply clamps on `min`
+    and `max`, which gives a bias towards the extremes.
+
     """
 
-    function: Literal["truncnormal"] = "truncnormal"
+    function: Literal["ert_truncnormal"] = "ert_truncnormal"
     mean: float
     std: float
+    min: float
+    max: float
 
 
 class PriorStdNormal(BaseModel):
@@ -78,12 +84,19 @@ class PriorUniform(BaseModel):
     max: float
 
 
-class PriorDUniform(BaseModel):
+class PriorErtDUniform(BaseModel):
     """
-    Discrete distribution parameter prior
+    ERT Discrete uniform distribution parameter prior
+
+    This discrete uniform distribution differs from the standard by using the
+    `bins` parameter. Normally, `a`, and `b` are integers, and the sample space
+    are the integers between. ERT allows `a` and `b` to be arbitrary floats,
+    where the sample space is binned.
+
     """
 
-    function: Literal["duniform"] = "duniform"
+    function: Literal["ert_duniform"] = "ert_duniform"
+    bins: int
     min: float
     max: float
 
@@ -98,20 +111,29 @@ class PriorLogUniform(BaseModel):
     max: float
 
 
-class PriorErf(BaseModel):
+class PriorErtErf(BaseModel):
     """
-    Error function distribution parameter prior
-    """
-
-    function: Literal["erf"] = "erf"
-
-
-class PriorDErf(BaseModel):
-    """
-    Discrete error function distribution parameter prior
+    ERT Error function distribution parameter prior
     """
 
-    function: Literal["derf"] = "derf"
+    function: Literal["ert_erf"] = "ert_erf"
+    min: float
+    max: float
+    skewness: float
+    width: float
+
+
+class PriorErtDErf(BaseModel):
+    """
+    ERT Discrete error function distribution parameter prior
+    """
+
+    function: Literal["ert_derf"] = "ert_derf"
+    bins: int
+    min: float
+    max: float
+    skewness: float
+    width: float
 
 
 Prior = Union[
@@ -119,11 +141,11 @@ Prior = Union[
     PriorTrig,
     PriorNormal,
     PriorLogNormal,
-    PriorTruncNormal,
+    PriorErtTruncNormal,
     PriorStdNormal,
     PriorUniform,
-    PriorDUniform,
+    PriorErtDUniform,
     PriorLogUniform,
-    PriorErf,
-    PriorDErf,
+    PriorErtErf,
+    PriorErtDErf,
 ]
