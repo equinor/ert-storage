@@ -45,3 +45,7 @@ class Ensemble(Base, MetadataField):
     @property
     def parameters(self) -> Iterable["Record"]:
         return self.records.filter_by(record_class=RecordClass.parameter)
+
+    @property
+    def responses(self) -> Iterable["Record"]:
+        return self.records.filter_by(record_class=RecordClass.other)
