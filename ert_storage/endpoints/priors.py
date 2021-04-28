@@ -8,13 +8,13 @@ from ert_storage.json_schema.prior import (
     PriorTrig,
     PriorNormal,
     PriorLogNormal,
-    PriorTruncNormal,
+    PriorErtTruncNormal,
     PriorStdNormal,
     PriorUniform,
-    PriorDUniform,
+    PriorErtDUniform,
     PriorLogUniform,
-    PriorErf,
-    PriorDErf,
+    PriorErtErf,
+    PriorErtDErf,
 )
 
 router = APIRouter(tags=["prior"])
@@ -33,13 +33,13 @@ PRIOR_FUNCTION_TO_PYDANTIC: Mapping[ds.PriorFunction, Type[js.Prior]] = {
     ds.PriorFunction.trig: PriorTrig,
     ds.PriorFunction.normal: PriorNormal,
     ds.PriorFunction.lognormal: PriorLogNormal,
-    ds.PriorFunction.truncnormal: PriorTruncNormal,
+    ds.PriorFunction.ert_truncnormal: PriorErtTruncNormal,
     ds.PriorFunction.stdnormal: PriorStdNormal,
     ds.PriorFunction.uniform: PriorUniform,
-    ds.PriorFunction.duniform: PriorDUniform,
+    ds.PriorFunction.ert_duniform: PriorErtDUniform,
     ds.PriorFunction.loguniform: PriorLogUniform,
-    ds.PriorFunction.erf: PriorErf,
-    ds.PriorFunction.derf: PriorDErf,
+    ds.PriorFunction.ert_erf: PriorErtErf,
+    ds.PriorFunction.ert_derf: PriorErtDErf,
 }
 
 
