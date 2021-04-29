@@ -595,49 +595,62 @@ def _get_and_assert_ensemble(
 async def _get_record_data(record: ds.Record, accept: Optional[str]) -> Response:
     type_ = record.record_type
     if type_ == ds.RecordType.float_vector:
-        if accept == "application/x-numpy":
-            from numpy.lib.format import write_array
-
-            stream = io.BytesIO()
-            write_array(stream, np.array(record.f64_matrix.content))
-
-            return Response(
-                content=stream.getvalue(),
-                media_type="application/x-numpy",
-            )
-        if accept == "application/x-dataframe":
-            data = pd.DataFrame(record.f64_matrix.content)
-            labels = record.f64_matrix.labels
-            if labels is not None:
-                data.columns = labels[0]
-                data.index = labels[1]
-            return Response(
-                content=data.to_csv().encode(),
-                media_type="application/x-dataframe",
-            )
-        else:
-            return record.f64_matrix.content
+        return _extract_float_vector(record=record, accept=accept)
     if type_ == ds.RecordType.file:
-        f = record.file
-        if f.content is not None:
-            return Response(
-                content=f.content,
-                media_type=f.mimetype,
-                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
-            )
-        elif f.az_container is not None and f.az_blob is not None:
-            blob = azure_blob_container.get_blob_client(f.az_blob)
-            download = await blob.download_blob()
-
-            async def chunk_generator() -> AsyncGenerator[bytes, None]:
-                async for chunk in download.chunks():
-                    yield chunk
-
-            return StreamingResponse(
-                chunk_generator(),
-                media_type=f.mimetype,
-                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
-            )
+        return await _extract_file(record=record)
     raise NotImplementedError(
         f"Getting record data for type {type_} and Accept header {accept} not implemented"
+    )
+
+
+def _extract_float_vector(record: ds.Record, accept: Optional[str]) -> Response:
+    if accept == "application/x-numpy":
+        from numpy.lib.format import write_array
+
+        stream = io.BytesIO()
+        write_array(stream, np.array(record.f64_matrix.content))
+
+        return Response(
+            content=stream.getvalue(),
+            media_type="application/x-numpy",
+        )
+    if accept == "application/x-dataframe":
+        data = pd.DataFrame(record.f64_matrix.content)
+        labels = record.f64_matrix.labels
+        if labels is not None:
+            data.columns = labels[0]
+            data.index = labels[1]
+        return Response(
+            content=data.to_csv().encode(),
+            media_type="application/x-dataframe",
+        )
+    else:
+        return record.f64_matrix.content
+
+
+async def _extract_file(record: ds.Record) -> Response:
+    f = record.file
+    if f.content is not None:
+        return Response(
+            content=f.content,
+            media_type=f.mimetype,
+            headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
+        )
+    elif f.az_container is not None and f.az_blob is not None:
+        blob = azure_blob_container.get_blob_client(f.az_blob)
+        download = await blob.download_blob()
+
+        async def chunk_generator() -> AsyncGenerator[bytes, None]:
+            async for chunk in download.chunks():
+                yield chunk
+
+        return StreamingResponse(
+            chunk_generator(),
+            media_type=f.mimetype,
+            headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
+        )
+
+    raise Exception(
+        f"Extracting data for record '{record.id}' of type '{record.record_type}' failed "
+        f"with both content and azure properties being 'None'"
     )
