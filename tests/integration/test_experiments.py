@@ -51,6 +51,7 @@ def test_ensemble_size(client, create_experiment, create_ensemble):
 
 
 def test_delete_experiment(client, create_experiment, create_ensemble):
+    num_experiments_before_test = len(client.get("/experiments").json())
     experiment_id = create_experiment("1")
 
     ensemble_id = create_ensemble(experiment_id, ["param1", "param2"])
@@ -88,7 +89,7 @@ def test_delete_experiment(client, create_experiment, create_ensemble):
         )
     observations = client.get(f"/experiments/{experiment_id}/observations").json()
     client.delete(f"/experiments/{experiment_id}")
-    assert len(client.get(f"/experiments").json()) == 0
+    assert len(client.get(f"/experiments").json()) == num_experiments_before_test
     for obs in observations:
         resp = client.get(f"/observations/{obs['id']}", check_status_code=None)
         assert resp.status_code == status.HTTP_404_NOT_FOUND
