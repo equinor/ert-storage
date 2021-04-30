@@ -1,10 +1,12 @@
 import io
 import json
 import random
-import numpy as np
 import itertools
+import numpy as np
+import pandas as pd
 import pytest
 from fastapi import status
+from numpy.testing import assert_array_equal
 
 
 NUM_REALIZATIONS = 5
@@ -75,6 +77,75 @@ def test_parameters(client, simple_ensemble):
             params=dict(realization_index=realization_index),
         )
         assert resp.json() == PARAMETERS[realization_index]
+
+
+def test_ensemble_wide_parameters(client, simple_ensemble):
+    ensemble_id = simple_ensemble(["coeffs"])
+    client.post(
+        f"/ensembles/{ensemble_id}/records/coeffs/matrix",
+        data=f"{PARAMETERS}",
+        params={"record_class": "parameter"},
+    )
+
+    # Fetch as ensemble-wide parameters
+    resp = client.get(f"/ensembles/{ensemble_id}/records/coeffs")
+    assert resp.json() == PARAMETERS
+
+    # Fetch with realization_index
+    for index, param in enumerate(PARAMETERS):
+        resp = client.get(
+            f"/ensembles/{ensemble_id}/records/coeffs",
+            params={"realization_index": index},
+        )
+        assert resp.json() == param
+
+
+@pytest.mark.parametrize("mimetype", ["application/x-dataframe", "text/csv"])
+def test_ensemble_wide_parameters_dataframe(client, simple_ensemble, mimetype):
+    ensemble_id = simple_ensemble(["coeffs"])
+    matrix = np.random.rand(8, 5)
+    labels = [
+        ["north", "south", "east", "west", "up"],
+        ["A", "B", "C", "D", "E", "F", "G", "H"],
+    ]
+
+    data = pd.DataFrame(matrix)
+    data.columns = labels[0]
+    data.index = labels[1]
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/coeffs/matrix",
+        data=data.to_csv(),
+        params={"record_class": "parameter"},
+        headers={"content-type": mimetype},
+    )
+
+    # Fetch as ensemble-wide parameters
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/coeffs",
+        headers={"accept": mimetype},
+    )
+    assert resp.content == data.to_csv().encode()
+
+    # Fetch with realization_index
+    for index, param in enumerate(data.iterrows()):
+        resp = client.get(
+            f"/ensembles/{ensemble_id}/records/coeffs",
+            params={"realization_index": index},
+            headers={"accept": mimetype},
+        )
+
+        # param[1] is a pd.Series type, which is converted to DataFrame and transposed
+        expect_param = param[1].to_frame().T
+        actual_param = pd.read_csv(
+            io.BytesIO(resp.content), index_col=0, float_precision="round_trip"
+        )
+        assert [index] == actual_param.index
+
+        # The index of the returned parameter vector is the realization index, not labels[1].
+        assert_array_equal([index], actual_param.index)
+        assert_array_equal(expect_param.columns, actual_param.columns)
+        assert_array_equal(expect_param.values, actual_param.values)
 
 
 def test_matrix(client, simple_ensemble):
@@ -180,9 +251,8 @@ def test_ensemble_matrix_json(client, simple_ensemble, get, post):
         raise NotImplementedError()
 
 
-def test_ensemble_matrix_dataframe(client, simple_ensemble):
-    from numpy.testing import assert_array_equal
-
+@pytest.mark.parametrize("mimetype", ["application/x-dataframe", "text/csv"])
+def test_ensemble_matrix_dataframe(client, simple_ensemble, mimetype):
     ensemble_id = simple_ensemble()
     matrix = np.random.rand(8, 5)
     labels = [
@@ -191,7 +261,6 @@ def test_ensemble_matrix_dataframe(client, simple_ensemble):
     ]
     # POST
     post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
-    import pandas as pd
 
     data = pd.DataFrame(matrix)
     data.columns = labels[0]
@@ -199,14 +268,14 @@ def test_ensemble_matrix_dataframe(client, simple_ensemble):
     resp = client.post(
         post_url,
         data=data.to_csv().encode(),
-        headers={"content-type": "application/x-dataframe"},
+        headers={"content-type": mimetype},
     )
 
     # GET
     get_url = f"/ensembles/{ensemble_id}/records/mat"
     resp = client.get(
         f"/ensembles/{ensemble_id}/records/mat",
-        headers={"accept": "application/x-dataframe"},
+        headers={"accept": mimetype},
     )
     stream = io.BytesIO(resp.content)
     df = pd.read_csv(stream, index_col=0, float_precision="round_trip")

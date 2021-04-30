@@ -2,6 +2,7 @@ from uuid import uuid4, UUID
 import io
 import numpy as np
 import pandas as pd
+from enum import Enum
 from typing import Any, Mapping, Optional, List, AsyncGenerator
 import sqlalchemy as sa
 from fastapi import (
@@ -21,6 +22,8 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.attributes import flag_modified
 from ert_storage.database import Session, get_db, HAS_AZURE_BLOB_STORAGE, BLOB_CONTAINER
 from ert_storage import database_schema as ds, json_schema as js
+
+from fastapi.logger import logger
 
 if HAS_AZURE_BLOB_STORAGE:
     from ert_storage.database import azure_blob_container
@@ -218,6 +221,12 @@ async def post_ensemble_record_matrix(
     """
     Assign an n-dimensional float matrix, encoded in JSON, to the given `name` record.
     """
+    if content_type == "application/x-dataframe":
+        logger.warning(
+            "Content-Type with 'application/x-dataframe' is deprecated. Use 'text/csv' instead."
+        )
+        content_type = "text/csv"
+
     if prior_id is not None and record_class != "parameter":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -249,7 +258,7 @@ async def post_ensemble_record_matrix(
 
             stream = io.BytesIO(await request.body())
             content = read_array(stream)
-        elif content_type == "application/x-dataframe":
+        elif content_type == "text/csv":
             stream = io.BytesIO(await request.body())
             df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
             content = df.values
@@ -419,14 +428,92 @@ async def get_record_observations(
     return []
 
 
-@router.get("/ensembles/{ensemble_id}/records/{name}")
+GET_CSV_NO_LABELS_DESCRIPTION = """\
+If the matrix data contained no label information, the returned CSV uses
+integer ranges as the column and row labels.
+
+If the record is a parameter matrix, the rows are the different realizations.
+"""
+
+
+GET_CSV_ALL_LABELS_DESCRIPTION = """\
+Returned CSV contains strings for column and row labels. The data itself is numeric.
+
+If the record is a parameter matrix, the rows are the different realizations.
+"""
+
+
+GET_NUMPY_DESCRIPTION = """\
+Data encoded with `numpy.lib.format.write_array` and `numpy.lib.format.read_array`.
+
+To parse data using Python, assuming ERT Storage is running on `http://localhost:8000` :
+
+```python
+   import io
+   import requests
+   from numpy.lib.format import read_array
+
+   resp = requests.get(
+       "http://localhost:8000/ensembles/{ENSEMBLE_ID}/records/{RECORD_NAME}",
+       headers={"Accept": "application/x-numpy"}
+   )
+   stream = io.BytesIO(resp.content)
+   nparray = read_array(stream)
+
+   # Print the numpy array
+   print(nparray)
+```
+"""
+
+
+@router.get(
+    "/ensembles/{ensemble_id}/records/{name}",
+    responses={
+        200: {
+            "description": "Successful fetch of record",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "no-labels": {
+                            "value": [[11.5, 12.5, 13.5], [21.5, 22.5, 23.5]],
+                        }
+                    }
+                },
+                "text/csv": {
+                    "examples": {
+                        "no-labels": {
+                            "value": ",\t0,\t1,\t2\n"
+                            "0,\t11.5,\t12.5,\t13.5\n"
+                            "1,\t21.5,\t22.5,\t23.5\n",
+                            "description": GET_CSV_NO_LABELS_DESCRIPTION,
+                        },
+                        "all-labels": {
+                            "value": ",\t2010-01-01,\t2015-01-01,\t2020-01-01\n"
+                            "real_0,\t11.5,\t\t12.5,\t\t13.5\n"
+                            "real_1,\t21.5,\t\t22.5,\t\t23.5\n",
+                            "description": GET_CSV_ALL_LABELS_DESCRIPTION,
+                        },
+                    }
+                },
+                "application/x-numpy": {
+                    "examples": {
+                        "success": {
+                            "summary": "Fetch data encoded in NPY array format",
+                            "description": GET_NUMPY_DESCRIPTION,
+                        }
+                    }
+                },
+            },
+        }
+    },
+)
 async def get_ensemble_record(
     *,
     db: Session = Depends(get_db),
     ensemble_id: UUID,
     realization_index: Optional[int] = None,
     name: str,
-    accept: Optional[str] = Header(default="application/json"),
+    accept: str = Header("application/json"),
 ) -> Any:
     """
     Get record with a given `name`. If `realization_index` is not set, look for
@@ -440,11 +527,28 @@ async def get_ensemble_record(
     - File:
       Will return the file that was uploaded.
     """
+    if accept == "application/x-dataframe":
+        logger.warning(
+            "Accept with 'application/x-dataframe' is deprecated. Use 'text/csv' instead."
+        )
+        accept = "text/csv"
+
     if realization_index is None:
         bundle = _get_ensemble_record(db, ensemble_id, name)
     else:
-        bundle = _get_forward_model_record(db, ensemble_id, name, realization_index)
-    return await _get_record_data(bundle, accept)
+        try:
+            bundle = _get_forward_model_record(db, ensemble_id, name, realization_index)
+            realization_index = None
+        except HTTPException as exc:
+            bundle = _get_ensemble_record(db, ensemble_id, name)
+
+            # Only parameter records can be "up-casted" to ensemble-wide
+            if (
+                bundle.record_type != ds.RecordType.float_vector
+                or bundle.record_class != ds.RecordClass.parameter
+            ):
+                raise exc
+    return await _get_record_data(bundle, accept, realization_index)
 
 
 @router.get("/ensembles/{ensemble_id}/parameters", response_model=List[str])
@@ -481,6 +585,12 @@ async def get_record_data(
     record_id: UUID,
     accept: Optional[str] = Header(default="application/json"),
 ) -> Any:
+    if accept == "application/x-dataframe":
+        logger.warning(
+            "Accept with 'application/x-dataframe' is deprecated. Use 'text/csv' instead."
+        )
+        accept = "text/csv"
+
     record = db.query(ds.Record).filter_by(id=record_id).one()
     return await _get_record_data(record, accept)
 
@@ -592,31 +702,47 @@ def _get_and_assert_ensemble(
     return ensemble
 
 
-async def _get_record_data(record: ds.Record, accept: Optional[str]) -> Response:
+async def _get_record_data(
+    record: ds.Record, accept: Optional[str], realization_index: Optional[int] = None
+) -> Response:
     type_ = record.record_type
     if type_ == ds.RecordType.float_vector:
+        if realization_index is None:
+            content = record.f64_matrix.content
+        else:
+            content = record.f64_matrix.content[realization_index]
+
         if accept == "application/x-numpy":
             from numpy.lib.format import write_array
 
             stream = io.BytesIO()
-            write_array(stream, np.array(record.f64_matrix.content))
+            write_array(stream, np.array(content))
 
             return Response(
                 content=stream.getvalue(),
                 media_type="application/x-numpy",
             )
-        if accept == "application/x-dataframe":
-            data = pd.DataFrame(record.f64_matrix.content)
+        if accept == "text/csv":
+            data = pd.DataFrame(content)
             labels = record.f64_matrix.labels
-            if labels is not None:
+            if labels is not None and realization_index is None:
                 data.columns = labels[0]
                 data.index = labels[1]
+            elif labels is not None and realization_index is not None:
+                # The output is such that rows are realizations. Because
+                # `content` is a 1d list in this case, it treats each element as
+                # its own row. We transpose the data so that all of the data
+                # falls on the same row.
+                data = data.T
+                data.columns = labels[0]
+                data.index = [realization_index]
+
             return Response(
                 content=data.to_csv().encode(),
-                media_type="application/x-dataframe",
+                media_type="text/csv",
             )
         else:
-            return record.f64_matrix.content
+            return content
     if type_ == ds.RecordType.file:
         f = record.file
         if f.content is not None:
