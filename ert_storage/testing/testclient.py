@@ -234,6 +234,19 @@ def testclient_factory() -> Generator[_TestClient, None, None]:
         env_unset = True
         print("Using in-memory SQLite database for tests")
 
+    if os.getenv("ERT_STORAGE_NO_ROLLBACK", ""):
+        print(
+            "Environment variable 'ERT_STORAGE_NO_ROLLBACK' not set or empty.\n"
+            "Will perform rollbacks after every test."
+        )
+        rollback = False
+    else:
+        print(
+            "Environment variable 'ERT_STORAGE_NO_ROLLBACK' is set.\n"
+            "Will keep data in database."
+        )
+        rollback = True
+
     from ert_storage.app import app
     from ert_storage.graphql import schema
 
@@ -243,7 +256,7 @@ def testclient_factory() -> Generator[_TestClient, None, None]:
     yield _TestClient(app, session=session, gql_schema=schema)
 
     schema.override_session = None
-    _end_transaction(transaction, connection)
+    _end_transaction(transaction, connection, rollback)
 
     if env_unset:
         del os.environ[env_key]
@@ -304,8 +317,9 @@ def _begin_transaction() -> _TransactionInfo:
     return session, transaction, connection
 
 
-def _end_transaction(transaction: Transaction, connection: Any) -> None:
-    # teardown: rollback database to before the test.
-    # For debugging change rollback to commit.
-    transaction.rollback()
+def _end_transaction(transaction: Transaction, connection: Any, rollback: bool) -> None:
+    if rollback:
+        transaction.rollback()
+    else:
+        transaction.commit()
     connection.close()
