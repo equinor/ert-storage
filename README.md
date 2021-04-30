@@ -186,4 +186,15 @@ export ERT_STORAGE_AZURE_CONNECTION_STRING="DefaultEndpointsProtocol=http;Accoun
 
 # Development
 For development, install the `test` extras `pip install ert-storage[test]`,
-which installs `black`, `pytest` and `mypy`. Run tests using `pytest`
+which installs `black`, `pytest` and `mypy`. Run tests using `pytest`.
+
+All integration tests must be able to pass when using a non-empty production
+database. In practice that means that each test needs to create a unique
+"experiment".
+
+During test debugging it might be helpful to have the tests persist data in the
+database. The following environment variable tells ERT Storage not to rollback the data after each test.
+
+``` sh
+export ERT_STORAGE_NO_ROLLBACK=1
+```
