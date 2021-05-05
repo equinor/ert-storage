@@ -227,8 +227,11 @@ class _TestClient:
 
 @contextmanager
 def testclient_factory() -> Generator[_TestClient, None, None]:
-    if "ERT_STORAGE_DATABASE_URL" not in os.environ:
-        os.environ["ERT_STORAGE_DATABASE_URL"] = "sqlite:///:memory:"
+    env_key = "ERT_STORAGE_DATABASE_URL"
+    env_unset = False
+    if env_key not in os.environ:
+        os.environ[env_key] = "sqlite:///:memory:"
+        env_unset = True
         print("Using in-memory SQLite database for tests")
 
     from ert_storage.app import app
@@ -241,6 +244,9 @@ def testclient_factory() -> Generator[_TestClient, None, None]:
 
     schema.override_session = None
     _end_transaction(transaction, connection)
+
+    if env_unset:
+        del os.environ[env_key]
 
 
 _TransactionInfo = Tuple[sessionmaker, Transaction, Any]
