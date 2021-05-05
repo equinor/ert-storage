@@ -56,7 +56,7 @@ async def get_response_misfits(
         if labels is not None:
             data_df.columns = labels[0]
             data_df.index = labels[1]
-        response_dict[response.realization_index] = data_df.copy()
+        response_dict[response.realization_index] = data_df
         if observation_df is None:
             # currently we expect only a single observation object, while
             # later in the future this might change
