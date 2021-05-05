@@ -21,7 +21,7 @@ def test_get_response_data(client, create_experiment, create_ensemble):
         for id_real, matrix in enumerate(matrices)
     }
     response_name = "FOPR"
-    # post responses with the corresponding observation
+    # post responses with realization_index
     for id_real in data_df:
         resp = client.post(
             f"/ensembles/{ensemble_id}/records/{response_name}/matrix",
