@@ -22,7 +22,7 @@ async def get_ensemble_response_dataframe(
         .filter_by(
             ensemble_pk=ensemble.pk,
             name=response_name,
-            _record_type=1,
+            record_class=ds.RecordClass.response,
         )
         .filter(ds.Record.realization_index != None)
     ).all()

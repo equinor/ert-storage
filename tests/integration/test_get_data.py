@@ -27,7 +27,7 @@ def test_get_response_data(client, create_experiment, create_ensemble):
             f"/ensembles/{ensemble_id}/records/{response_name}/matrix",
             data=data_df[id_real].to_csv().encode(),
             headers={"content-type": "application/x-dataframe"},
-            params=dict(realization_index=id_real),
+            params=dict(realization_index=id_real, record_class="response"),
         )
 
     resp = client.get(f"/ensembles/{ensemble_id}/responses/{response_name}/data")
