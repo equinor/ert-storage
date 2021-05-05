@@ -31,9 +31,9 @@ def test_misfits_with_labels(client, create_experiment, create_ensemble):
 
     data_df = {
         id_real: pd.DataFrame(
-            matrix,
-            columns=[f"{id_real}"],
-            index=["A", "B", "C", "D", "E", "F", "G", "H"],
+            [matrix],
+            index=[f"{id_real}"],
+            columns=["A", "B", "C", "D", "E", "F", "G", "H"],
         )
         for id_real, matrix in enumerate(matrices)
     }
@@ -58,8 +58,8 @@ def test_misfits_with_labels(client, create_experiment, create_ensemble):
     )
     stream = io.BytesIO(resp.content)
     misfits_df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
-    assert misfits_df.shape == (3, 5)
-    assert_array_equal(misfits_df.index, obs["x_axis"])
+    assert misfits_df.shape == (5, 3)
+    assert_array_equal(misfits_df.columns, obs["x_axis"])
 
     # get summary misfits for all realizations
     resp = client.get(
@@ -70,7 +70,7 @@ def test_misfits_with_labels(client, create_experiment, create_ensemble):
     )
     stream = io.BytesIO(resp.content)
     misfits_df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
-    assert misfits_df.shape == (1, 5)
+    assert misfits_df.shape == (5, 1)
 
     # get realization #4 univariate misfits
     resp = client.get(
@@ -82,5 +82,5 @@ def test_misfits_with_labels(client, create_experiment, create_ensemble):
     stream = io.BytesIO(resp.content)
     misfits_df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
 
-    assert_array_equal(misfits_df.index, obs["x_axis"])
-    assert misfits_df.shape == (3, 1)
+    assert_array_equal(misfits_df.columns, obs["x_axis"])
+    assert misfits_df.shape == (1, 3)

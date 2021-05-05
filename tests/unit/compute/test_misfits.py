@@ -43,7 +43,7 @@ observation = {
 
 def _get_dummy_response_df():
     return pd.DataFrame(
-        np.random.rand(8), index=["A", "B", "C", "D", "E", "F", "G", "H"]
+        [np.random.rand(8)], columns=["A", "B", "C", "D", "E", "F", "G", "H"]
     )
 
 
@@ -58,7 +58,7 @@ def test_misfits_computation():
     response_dict = {}
     for realization_index, values in enumerate(responses_values):
         response_dict[realization_index] = pd.DataFrame(
-            values, index=["A", "B", "C", "D", "E", "F", "G", "H"]
+            [values], columns=["A", "B", "C", "D", "E", "F", "G", "H"]
         )
 
     observation_df = _get_dummy_observation_df()
@@ -70,7 +70,7 @@ def test_misfits_computation():
     for id_real in univariate_misfits_results:
         assert_array_almost_equal(
             univariate_misfits_results[id_real],
-            misfits_df[id_real].values.flatten(),
+            misfits_df.loc[id_real].values.flatten(),
             decimal=4,
         )
 
@@ -90,7 +90,7 @@ def test_misfits_observations_match_response_values():
     data_df = _get_dummy_response_df()
     observation_df = _get_dummy_observation_df()
     # set values to match observations
-    data_df.loc[observation["x_axis"], 0] = observation_df["values"].values
+    data_df.loc[0, observation["x_axis"]] = observation_df["values"].values
 
     misfits_df = calculate_misfits_from_pandas(
         {0: data_df}, observation_df, summary_misfits=False
@@ -132,7 +132,7 @@ def test_misfits_increasing_response_values():
     misfits_increased_responses = {}
     for idx in range(3):
         # set response values as observation values and add a constant
-        data_df.loc[observation["x_axis"], 0] = observation_df["values"] + idx
+        data_df.loc[0, observation["x_axis"]] = observation_df["values"] + idx
         misfits_increased_responses[idx] = (
             calculate_misfits_from_pandas(
                 {0: data_df}, observation_df, summary_misfits=False
