@@ -54,6 +54,7 @@ class _TestClient:
         raise_server_exceptions: bool = True,
         root_path: str = "",
     ) -> None:
+        self.raise_on_client_error = True
         self.http_client = StarletteTestClient(
             app, base_url, raise_server_exceptions, root_path
         )
@@ -82,7 +83,7 @@ class _TestClient:
             allow_redirects=allow_redirects,
             stream=stream,
         )
-        _check(check_status_code, resp)
+        self._check(check_status_code, resp)
         return resp
 
     def post(
@@ -111,7 +112,7 @@ class _TestClient:
             stream=stream,
             json=json,
         )
-        _check(check_status_code, resp)
+        self._check(check_status_code, resp)
         return resp
 
     def put(
@@ -140,7 +141,7 @@ class _TestClient:
             stream=stream,
             json=json,
         )
-        _check(check_status_code, resp)
+        self._check(check_status_code, resp)
         return resp
 
     def patch(
@@ -169,7 +170,7 @@ class _TestClient:
             stream=stream,
             json=json,
         )
-        _check(check_status_code, resp)
+        self._check(check_status_code, resp)
         return resp
 
     def delete(
@@ -190,7 +191,7 @@ class _TestClient:
             timeout=timeout,
             allow_redirects=allow_redirects,
         )
-        _check(check_status_code, resp)
+        self._check(check_status_code, resp)
         return resp
 
     def gql_execute(
@@ -200,10 +201,28 @@ class _TestClient:
         check: bool = True,
     ) -> dict:
         doc = self.gql_client.execute(request_string, variable_values=variable_values)
-        if check and "errors" in doc:
+        if self.raise_on_client_error and check and "errors" in doc:
             raise ClientError(f"GraphQL query returned an error:\n{pformat(doc)}")
 
         return doc
+
+    def _check(
+        self, check_status_code: Optional[int], response: requests.Response
+    ) -> None:
+        if (
+            not self.raise_on_client_error
+            or check_status_code is None
+            or response.status_code == check_status_code
+        ):
+            return
+
+        try:
+            doc = response.json()
+        except:
+            doc = response.content
+        raise ClientError(
+            f"Status code was {response.status_code}, expected {check_status_code}:\n{doc}"
+        )
 
 
 @contextmanager
@@ -284,14 +303,3 @@ def _end_transaction(transaction: Transaction, connection: Any) -> None:
     # For debugging change rollback to commit.
     transaction.rollback()
     connection.close()
-
-
-def _check(check_status_code: Optional[int], response: requests.Response) -> None:
-    if check_status_code is not None and response.status_code != check_status_code:
-        try:
-            doc = response.json()
-        except:
-            doc = response.content
-        raise ClientError(
-            f"Status code was {response.status_code}, expected {check_status_code}:\n{doc}"
-        )
