@@ -1,3 +1,4 @@
+import os
 import pytest
 from ert_storage.testing import testclient
 
@@ -62,3 +63,13 @@ def test_gql(should_raise):
             tc.gql_execute(query)
     else:
         assert "errors" in tc.gql_execute(query)
+
+
+def test_environ(monkeypatch):
+    monkeypatch.delenv("ERT_STORAGE_DATABASE_URL", raising=False)
+    pre_env = os.environ.copy()
+
+    with testclient.testclient_factory():
+        pass
+
+    assert pre_env == os.environ
