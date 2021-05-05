@@ -14,9 +14,9 @@ def test_get_response_data(client, create_experiment, create_ensemble):
 
     data_df = {
         id_real: pd.DataFrame(
-            matrix,
-            columns=[f"{id_real}"],
-            index=["A", "B", "C", "D", "E", "F", "G", "H"],
+            [matrix],
+            index=[f"{id_real}"],
+            columns=["A", "B", "C", "D", "E", "F", "G", "H"],
         )
         for id_real, matrix in enumerate(matrices)
     }

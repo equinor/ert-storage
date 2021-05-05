@@ -31,11 +31,11 @@ async def get_ensemble_response_dataframe(
         data_df = pd.DataFrame(record.f64_matrix.content)
         labels = record.f64_matrix.labels
         if labels is not None:
-            data_df.columns = [record.realization_index]
-            data_df.index = labels[1]
+            data_df.index = [record.realization_index]
+            data_df.columns = labels[0]
         df_list.append(data_df)
 
     return Response(
-        content=pd.concat(df_list, axis=1).T.to_csv().encode(),
+        content=pd.concat(df_list, axis=0).to_csv().encode(),
         media_type="application/x-dataframe",
     )
