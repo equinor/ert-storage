@@ -6,6 +6,7 @@ from .observations import router as observations_router
 from .updates import router as updates_router
 from .priors import router as priors_router
 from .compute.misfits import router as misfits_router
+from .responses import router as response_router
 
 router = APIRouter()
 router.include_router(experiments_router)
@@ -15,3 +16,4 @@ router.include_router(observations_router)
 router.include_router(updates_router)
 router.include_router(priors_router)
 router.include_router(misfits_router)
+router.include_router(response_router)
