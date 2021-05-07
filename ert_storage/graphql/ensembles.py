@@ -1,3 +1,4 @@
+from ert_storage.database_schema.record import RecordClass
 from typing import Iterable, List, Optional, TYPE_CHECKING
 import graphene as gr
 from graphene_sqlalchemy.utils import get_session
@@ -17,8 +18,21 @@ class Ensemble(SQLAlchemyObjectType):
 
     child_ensembles = gr.List(lambda: Ensemble)
     parent_ensemble = gr.Field(lambda: Ensemble)
-    responses = gr.Field("ert_storage.graphql.responses.Response")
+    response_names = gr.List(gr.String)
+    responses = gr.List("ert_storage.graphql.responses.Response")
+    parameter_names = gr.List(gr.String)
     parameters = gr.List("ert_storage.graphql.parameters.Parameter")
+    response_observations = gr.List(
+        "ert_storage.graphql.observations.Observation", name=gr.String()
+    )
+
+    def resolve_response_observations(
+        root: ds.Ensemble, info: "ResolveInfo", name: str
+    ) -> Iterable[ds.Observation]:
+        response_index_0 = root.records.filter_by(name=name).first()
+        if response_index_0:
+            return response_index_0.observations
+        return None
 
     def resolve_child_ensembles(
         root: ds.Ensemble, info: "ResolveInfo"
@@ -33,10 +47,35 @@ class Ensemble(SQLAlchemyObjectType):
             return update.ensemble_reference
         return None
 
+    def resolve_response_names(root: ds.Ensemble, info: "ResolveInfo") -> List[str]:
+        session = info.context["session"]
+        return [
+            x[0]
+            for x in session.query(ds.Record.name)
+            .filter_by(ensemble_pk=root.pk, record_class=RecordClass.other)
+            .filter(ds.Record.realization_index != None)
+            .distinct()
+        ]
+
+    def resolve_parameter_names(root: ds.Ensemble, info: "ResolveInfo") -> List[str]:
+        session = info.context["session"]
+        return [
+            x[0]
+            for x in session.query(ds.Record.name)
+            .filter_by(ensemble_pk=root.pk, record_class=RecordClass.parameter)
+            .filter(ds.Record.realization_index != None)
+            .distinct()
+        ]
+
     def resolve_parameters(
         root: ds.Ensemble, info: "ResolveInfo"
-    ) -> Iterable[ds.Prior]:
+    ) -> Iterable[ds.Record]:
         return root.parameters
+
+    def resolve_responses(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> Iterable[ds.Record]:
+        return root.records.filter_by(record_class=RecordClass.other)
 
 
 class CreateEnsemble(SQLAlchemyMutation):

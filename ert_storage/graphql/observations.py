@@ -1,4 +1,4 @@
-from typing import List, Optional, Iterable, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 import graphene as gr
 
 from ert_storage.ext.graphene_sqlalchemy import SQLAlchemyObjectType
@@ -9,6 +9,6 @@ if TYPE_CHECKING:
     from graphql.execution.base import ResolveInfo
 
 
-class Response(SQLAlchemyObjectType):
+class Observation(SQLAlchemyObjectType):
     class Meta:
-        model = ds.Record
+        model = ds.Observation
