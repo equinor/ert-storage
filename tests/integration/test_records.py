@@ -148,6 +148,20 @@ def test_ensemble_wide_parameters_dataframe(client, simple_ensemble, mimetype):
         assert_array_equal(expect_param.values, actual_param.values)
 
 
+def test_ensemble_wide_parameters_1d(client, simple_ensemble):
+    """
+    Ensemble-wide parameter records must be at least 2-dimensional, where the
+    first axis is the realization index
+    """
+    ensemble_id = simple_ensemble(["coeffs"])
+    client.post(
+        f"/ensembles/{ensemble_id}/records/coeffs/matrix",
+        json=[1, 2, 3, 4, 5],
+        params={"record_class": "parameter"},
+        check_status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+    )
+
+
 def test_matrix(client, simple_ensemble):
     ensemble_id = simple_ensemble()
 
@@ -372,7 +386,7 @@ def test_responses(client, simple_ensemble):
     ensemble_id = simple_ensemble()
     records = [
         ("rec1", "[1, 2, 3, 4, 5]", "other"),
-        ("rec2", "[5, 4, 3, 2, 1]", "parameter"),
+        ("rec2", "[[4, 3, 2, 1]]", "parameter"),
         ("rec3", "[[1, 2], [4, 5]]", "response"),
         ("rec4", "[[1, 2], [4, 5]]", None),
     ]

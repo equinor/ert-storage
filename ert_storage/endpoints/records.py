@@ -283,13 +283,28 @@ async def post_ensemble_record_matrix(
                 "realization_index": realization_index,
             },
         )
-
-    matrix_obj = ds.F64Matrix(content=content.tolist(), labels=labels)
-    db.add(matrix_obj)
     if not record_class:
         record_class_enum = ds.RecordClass.other
     else:
         record_class_enum = ds.RecordClass.__members__[record_class]
+
+    # Require that the dimensionality of an ensemble-wide parameter matrix is at least 2
+    if realization_index is None and record_class_enum == ds.RecordClass.parameter:
+        if content.ndim <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "error": "Ensemble-wide parameter record '{name}' for ensemble '{ensemble_id}'"
+                    "must have dimensionality of at least 2",
+                    "name": name,
+                    "ensemble_id": str(ensemble_id),
+                    "realization_index": realization_index,
+                },
+            )
+
+    matrix_obj = ds.F64Matrix(content=content.tolist(), labels=labels)
+    db.add(matrix_obj)
+
     record_obj = ds.Record(
         name=name,
         record_type=ds.RecordType.float_vector,
