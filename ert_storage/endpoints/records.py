@@ -33,18 +33,52 @@ class RecordWrapper:
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    async def add_file(
-        self, name: str, file: UploadFile, realization_index: Optional[int]
-    ) -> ds.File:
-
-        file_obj = ds.File(
+    @staticmethod
+    def _create_file(file: UploadFile) -> ds.File:
+        return ds.File(
             filename=file.filename,
             mimetype=file.content_type,
         )
 
+    @staticmethod
+    def _create_file_block(
+        ensemble: ds.Ensemble, block_index: int, name: str, realization_index: int
+    ):
+        block_id = str(uuid4())
+        return ds.FileBlock(
+            ensemble=ensemble,
+            block_id=block_id,
+            block_index=block_index,
+            record_name=name,
+            realization_index=realization_index,
+        )
+
+    async def add_file(
+        self, name: str, file: UploadFile, realization_index: Optional[int]
+    ) -> ds.File:
+
+        file_obj = RecordWrapper._create_file(file=file)
         file_obj.content = await file.read()
         self._db.add(file_obj)
         return file_obj
+
+    async def add_file_block(
+        self,
+        ensemble: ds.Ensemble,
+        block_index: int,
+        name: str,
+        realization_index: int,
+        request: Request,
+    ):
+        file_block_obj = RecordWrapper._create_file_block(
+            ensemble=ensemble,
+            block_index=block_index,
+            name=name,
+            realization_index=realization_index,
+        )
+
+        file_block_obj.content = await request.body()
+        self._db.add(file_block_obj)
 
     def add_record(
         self,
@@ -85,15 +119,35 @@ class AzureRecordWrapper(RecordWrapper):
 
         key = f"{name}@{realization_index}@{uuid4()}"
         await AzureRecordWrapper._upload(key=key, file=file)
-        return self._add_file(
-            key=key, file_name=file.filename, content_type=file.content_type
+        return self._add_file(key=key, file=file)
+
+    async def add_file_block(
+        self,
+        ensemble: ds.Ensemble,
+        block_index: int,
+        name: str,
+        realization_index: int,
+        request: Request,
+    ):
+        file_block_obj = RecordWrapper._create_file_block(
+            ensemble=ensemble,
+            block_index=block_index,
+            name=name,
+            realization_index=realization_index,
         )
 
-    def _add_file(self, key: str, file_name: str, content_type: str) -> ds.File:
-        file_obj = ds.File(
-            filename=file_name,
-            mimetype=content_type,
+        record_obj = self.get_record(
+            name=name, realization_index=realization_index, ensemble=ensemble
         )
+        await AzureRecordWrapper._stage(
+            key=record_obj.file.az_blob,
+            block_id=file_block_obj.block_id,
+            request=request,
+        )
+        self._db.add(file_block_obj)
+
+    def _add_file(self, key: str, file: UploadFile) -> ds.File:
+        file_obj = RecordWrapper._create_file(file)
         file_obj.az_container = azure_blob_container.container_name
         file_obj.az_blob = key
         self._db.add(file_obj)
@@ -103,6 +157,11 @@ class AzureRecordWrapper(RecordWrapper):
     async def _upload(key: str, file: UploadFile):
         blob = azure_blob_container.get_blob_client(key)
         await blob.upload_blob(file.file)
+
+    @staticmethod
+    async def _stage(key: str, block_id: str, request: Request):
+        blob = azure_blob_container.get_blob_client(key)
+        await blob.stage_block(block_id, await request.body())
 
 
 def get_record_wrapper(db: Session) -> RecordWrapper:
@@ -155,33 +214,16 @@ async def add_block(
     """
     Stage blocks to an existing azure blob record.
     """
-
+    wrapper = get_record_wrapper(db=db)
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    block_id = str(uuid4())
 
-    file_block_obj = ds.FileBlock(
+    await wrapper.add_file_block(
         ensemble=ensemble,
-        block_id=block_id,
         block_index=block_index,
-        record_name=name,
+        name=name,
         realization_index=realization_index,
+        request=request,
     )
-
-    record_obj = (
-        db.query(ds.Record)
-        .filter_by(
-            ensemble_pk=ensemble.pk, name=name, realization_index=realization_index
-        )
-        .one()
-    )
-    if HAS_AZURE_BLOB_STORAGE:
-        key = record_obj.file.az_blob
-        blob = azure_blob_container.get_blob_client(key)
-        await blob.stage_block(block_id, await request.body())
-    else:
-        file_block_obj.content = await request.body()
-
-    db.add(file_block_obj)
     db.commit()
 
 
