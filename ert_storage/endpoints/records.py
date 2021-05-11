@@ -29,6 +29,88 @@ if HAS_AZURE_BLOB_STORAGE:
 router = APIRouter(tags=["record"])
 
 
+class RecordWrapper:
+    def __init__(self, db: Session) -> None:
+        self._db = db
+
+    async def add_file(
+        self, name: str, file: UploadFile, realization_index: Optional[int]
+    ) -> ds.File:
+
+        file_obj = ds.File(
+            filename=file.filename,
+            mimetype=file.content_type,
+        )
+
+        file_obj.content = await file.read()
+        self._db.add(file_obj)
+        return file_obj
+
+    def add_record(
+        self,
+        name: str,
+        file: ds.File,
+        ensemble: ds.Ensemble,
+        realization_index: Optional[int],
+    ) -> ds.Record:
+
+        record_obj = ds.Record(
+            name=name,
+            record_type=ds.RecordType.file,
+            realization_index=realization_index,
+            file=file,
+            record_class=ds.RecordClass.other,
+            ensemble=ensemble,
+        )
+
+        self._db.add(record_obj)
+
+    def get_record(
+        self, name: str, ensemble: ds.Ensemble, realization_index: Optional[int]
+    ) -> ds.Record:
+
+        return (
+            self._db.query(ds.Record)
+            .filter_by(
+                ensemble_pk=ensemble.pk, name=name, realization_index=realization_index
+            )
+            .one()
+        )
+
+
+class AzureRecordWrapper(RecordWrapper):
+    async def add_file(
+        self, name: str, file: UploadFile, realization_index: Optional[int]
+    ) -> ds.File:
+
+        key = f"{name}@{realization_index}@{uuid4()}"
+        await AzureRecordWrapper._upload(key=key, file=file)
+        return self._add_file(
+            key=key, file_name=file.filename, content_type=file.content_type
+        )
+
+    def _add_file(self, key: str, file_name: str, content_type: str) -> ds.File:
+        file_obj = ds.File(
+            filename=file_name,
+            mimetype=content_type,
+        )
+        file_obj.az_container = azure_blob_container.container_name
+        file_obj.az_blob = key
+        self._db.add(file_obj)
+        return file_obj
+
+    @staticmethod
+    async def _upload(key: str, file: UploadFile):
+        blob = azure_blob_container.get_blob_client(key)
+        await blob.upload_blob(file.file)
+
+
+def get_record_wrapper(db: Session) -> RecordWrapper:
+    if HAS_AZURE_BLOB_STORAGE:
+        return AzureRecordWrapper(db=db)
+    return RecordWrapper(db=db)
+
+
 class ListRecords(BaseModel):
     ensemble: Mapping[str, str]
     forward_model: Mapping[str, str]
@@ -46,33 +128,18 @@ async def post_ensemble_record_file(
     """
     Assign an arbitrary file to the given `name` record.
     """
+    wrapper = get_record_wrapper(db=db)
+
     ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
 
-    file_obj = ds.File(
-        filename=file.filename,
-        mimetype=file.content_type,
+    file_obj = await wrapper.add_file(
+        name=name, realization_index=realization_index, file=file
     )
-    if HAS_AZURE_BLOB_STORAGE:
-        key = f"{name}@{realization_index}@{uuid4()}"
-        blob = azure_blob_container.get_blob_client(key)
-        await blob.upload_blob(file.file)
-
-        file_obj.az_container = azure_blob_container.container_name
-        file_obj.az_blob = key
-    else:
-        file_obj.content = await file.read()
-
-    db.add(file_obj)
-    record_obj = ds.Record(
-        name=name,
-        record_type=ds.RecordType.file,
-        realization_index=realization_index,
-        file=file_obj,
-        record_class=ds.RecordClass.other,
+    wrapper.add_record(
+        ensemble=ensemble, name=name, realization_index=realization_index, file=file_obj
     )
 
-    record_obj.ensemble = ensemble
-    db.add(record_obj)
+    db.commit()
 
 
 @router.put("/ensembles/{ensemble_id}/records/{name}/blob")
