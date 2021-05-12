@@ -1,5 +1,5 @@
 from ert_storage.database_schema.record import RecordClass
-from typing import Iterable, List, Optional, TYPE_CHECKING
+from typing import Iterable, List, Mapping, Optional, TYPE_CHECKING
 import graphene as gr
 from graphene_sqlalchemy.utils import get_session
 
@@ -19,7 +19,10 @@ class Ensemble(SQLAlchemyObjectType):
     child_ensembles = gr.List(lambda: Ensemble)
     parent_ensemble = gr.Field(lambda: Ensemble)
     response_names = gr.List(gr.String)
-    responses = gr.List("ert_storage.graphql.responses.Response")
+    responses = gr.Field(
+        gr.List("ert_storage.graphql.responses.Response"),
+        names=gr.Argument(gr.List(gr.String), required=False, default_value=None),
+    )
     parameter_names = gr.List(gr.String)
     parameters = gr.List("ert_storage.graphql.parameters.Parameter")
 
@@ -47,9 +50,13 @@ class Ensemble(SQLAlchemyObjectType):
         ]
 
     def resolve_responses(
-        root: ds.Ensemble, info: "ResolveInfo"
+        root: ds.Ensemble, info: "ResolveInfo", names: Optional[Iterable[str]] = None
     ) -> Iterable[ds.Record]:
-        return root.records.filter_by(record_class=ds.RecordClass.response)
+        if names is None:
+            return root.records.filter_by(record_class=ds.RecordClass.response)
+        return root.records.filter_by(record_class=ds.RecordClass.response).filter(
+            ds.Record.name.in_(names)
+        )
 
     def resolve_parameter_names(
         root: ds.Ensemble, info: "ResolveInfo"
