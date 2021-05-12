@@ -34,10 +34,10 @@ class RecordWrapper:
         self._db = db
 
     @staticmethod
-    def _create_file(file: UploadFile) -> ds.File:
+    def _create_file(filename: str, content_type: str) -> ds.File:
         return ds.File(
-            filename=file.filename,
-            mimetype=file.content_type,
+            filename=filename,
+            mimetype=content_type,
         )
 
     @staticmethod
@@ -57,7 +57,9 @@ class RecordWrapper:
         self, name: str, file: UploadFile, realization_index: Optional[int]
     ) -> ds.File:
 
-        file_obj = RecordWrapper._create_file(file=file)
+        file_obj = RecordWrapper._create_file(
+            filename=file.filename, content_type=file.content_type
+        )
         file_obj.content = await file.read()
         self._db.add(file_obj)
         return file_obj
@@ -86,18 +88,41 @@ class RecordWrapper:
         file: ds.File,
         ensemble: ds.Ensemble,
         realization_index: Optional[int],
+        record_type: Optional[ds.RecordType] = ds.RecordType.file,
+        record_class: Optional[ds.RecordClass] = ds.RecordClass.other,
     ) -> ds.Record:
 
         record_obj = ds.Record(
             name=name,
-            record_type=ds.RecordType.file,
+            record_type=record_type,
             realization_index=realization_index,
             file=file,
-            record_class=ds.RecordClass.other,
+            record_class=record_class,
             ensemble=ensemble,
         )
 
         self._db.add(record_obj)
+
+    def add_blob(self, name: str, realization_index: int) -> ds.File:
+        file_obj = RecordWrapper._create_file(
+            filename="test",
+            content_type="mime/type",
+        )
+
+        self._db.add(file_obj)
+        return file_obj
+
+    async def finalize_blob(
+        self, name: str, ensemble: ds.Ensemble, realization_index: Optional[int]
+    ):
+        record_obj = self.get_record(
+            name=name, ensemble=ensemble, realization_index=realization_index
+        )
+        submitted_blocks = self.get_file_blocks(
+            name=name, ensemble=ensemble, realization_index=realization_index
+        )
+        data = b"".join([block.content for block in submitted_blocks])
+        record_obj.file.content = data
 
     def get_record(
         self, name: str, ensemble: ds.Ensemble, realization_index: Optional[int]
@@ -109,6 +134,19 @@ class RecordWrapper:
                 ensemble_pk=ensemble.pk, name=name, realization_index=realization_index
             )
             .one()
+        )
+
+    def get_file_blocks(
+        self, name: str, ensemble: ds.Ensemble, realization_index: Optional[int]
+    ) -> List[ds.FileBlock]:
+        return list(
+            self._db.query(ds.FileBlock)
+            .filter_by(
+                record_name=name,
+                ensemble_pk=ensemble.pk,
+                realization_index=realization_index,
+            )
+            .all()
         )
 
 
@@ -146,8 +184,42 @@ class AzureRecordWrapper(RecordWrapper):
         )
         self._db.add(file_block_obj)
 
+    def add_blob(self, name: str, realization_index: int) -> ds.File:
+        file_obj = RecordWrapper._create_file(
+            filename="test",
+            content_type="mime/type",
+        )
+        key = f"{name}@{realization_index}@{uuid4()}"
+        blob = azure_blob_container.get_blob_client(key)
+        file_obj.az_container = (azure_blob_container.container_name,)
+        file_obj.az_blob = (key,)
+
+        self._db.add(file_obj)
+        return file_obj
+
+    async def finalize_blob(
+        self, name: str, ensemble: ds.Ensemble, realization_index: Optional[int]
+    ):
+        record_obj = self.get_record(
+            name=name, ensemble=ensemble, realization_index=realization_index
+        )
+
+        submitted_blocks = self.get_file_blocks(
+            name=name, ensemble=ensemble, realization_index=realization_index
+        )
+
+        key = record_obj.file.az_blob
+        blob = azure_blob_container.get_blob_client(key)
+        block_ids = [
+            block.block_id
+            for block in sorted(submitted_blocks, key=lambda x: x.block_index)
+        ]
+        await blob.commit_block_list(block_ids)
+
     def _add_file(self, key: str, file: UploadFile) -> ds.File:
-        file_obj = RecordWrapper._create_file(file)
+        file_obj = RecordWrapper._create_file(
+            filename=file.filename, content_type=file.content_type
+        )
         file_obj.az_container = azure_blob_container.container_name
         file_obj.az_blob = key
         self._db.add(file_obj)
@@ -238,31 +310,14 @@ async def create_blob(
     """
     Create a record which points to a blob on Azure Blob Storage.
     """
+    wrapper = get_record_wrapper(db=db)
 
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    file_obj = ds.File(
-        filename="test",
-        mimetype="mime/type",
-    )
-    if HAS_AZURE_BLOB_STORAGE:
-        key = f"{name}@{realization_index}@{uuid4()}"
-        blob = azure_blob_container.get_blob_client(key)
-        file_obj.az_container = (azure_blob_container.container_name,)
-        file_obj.az_blob = (key,)
-    else:
-        pass
+    file_obj = wrapper.add_blob(name=name, realization_index=realization_index)
 
-    db.add(file_obj)
-    record_obj = ds.Record(
-        name=name,
-        record_type=ds.RecordType.file,
-        realization_index=realization_index,
-        file=file_obj,
-        record_class=ds.RecordClass.other,
+    wrapper.add_record(
+        ensemble=ensemble, name=name, realization_index=realization_index, file=file_obj
     )
-
-    record_obj.ensemble = ensemble
-    db.add(record_obj)
 
 
 @router.patch("/ensembles/{ensemble_id}/records/{name}/blob")
@@ -277,37 +332,12 @@ async def finalize_blob(
     Commit all staged blocks to a blob record
     """
 
+    wrapper = get_record_wrapper(db=db)
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
-    record_obj = (
-        db.query(ds.Record)
-        .filter_by(
-            ensemble_pk=ensemble.pk, name=name, realization_index=realization_index
-        )
-        .one()
+    await wrapper.finalize_blob(
+        name=name, ensemble=ensemble, realization_index=realization_index
     )
-
-    submitted_blocks = list(
-        db.query(ds.FileBlock)
-        .filter_by(
-            record_name=name,
-            ensemble_pk=ensemble.pk,
-            realization_index=realization_index,
-        )
-        .all()
-    )
-
-    if HAS_AZURE_BLOB_STORAGE:
-        key = record_obj.file.az_blob
-        blob = azure_blob_container.get_blob_client(key)
-        block_ids = [
-            block.block_id
-            for block in sorted(submitted_blocks, key=lambda x: x.block_index)
-        ]
-        await blob.commit_block_list(block_ids)
-    else:
-        data = b"".join([block.content for block in submitted_blocks])
-        record_obj.file.content = data
 
 
 @router.post(
