@@ -20,6 +20,8 @@ class Ensemble(SQLAlchemyObjectType):
     parent_ensemble = gr.Field(lambda: Ensemble)
     response_names = gr.List(gr.String)
     responses = gr.List("ert_storage.graphql.responses.Response")
+    parameter_names = gr.List(gr.String)
+    parameters = gr.List("ert_storage.graphql.parameters.Parameter")
 
     def resolve_child_ensembles(
         root: ds.Ensemble, info: "ResolveInfo"
@@ -48,6 +50,16 @@ class Ensemble(SQLAlchemyObjectType):
         root: ds.Ensemble, info: "ResolveInfo"
     ) -> Iterable[ds.Record]:
         return root.records.filter_by(record_class=ds.RecordClass.response)
+
+    def resolve_parameter_names(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> Iterable[str]:
+        return root.inputs
+
+    def resolve_parameters(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> Iterable[ds.Record]:
+        return root.records.filter_by(record_class=ds.RecordClass.parameter)
 
 
 class CreateEnsemble(SQLAlchemyMutation):
