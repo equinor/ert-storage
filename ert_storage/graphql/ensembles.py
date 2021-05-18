@@ -1,3 +1,4 @@
+from ert_storage.database_schema import record
 from ert_storage.database_schema.record import RecordClass
 from typing import Iterable, List, Mapping, Optional, TYPE_CHECKING
 import graphene as gr
@@ -18,13 +19,14 @@ class Ensemble(SQLAlchemyObjectType):
 
     child_ensembles = gr.List(lambda: Ensemble)
     parent_ensemble = gr.Field(lambda: Ensemble)
-    response_names = gr.List(gr.String)
     responses = gr.Field(
         gr.List("ert_storage.graphql.responses.Response"),
         names=gr.Argument(gr.List(gr.String), required=False, default_value=None),
     )
-    parameter_names = gr.List(gr.String)
+    unique_responses = gr.List("ert_storage.graphql.responses.Response")
+
     parameters = gr.List("ert_storage.graphql.parameters.Parameter")
+    unique_parameters = gr.List("ert_storage.graphql.parameters.Parameter")
 
     def resolve_child_ensembles(
         root: ds.Ensemble, info: "ResolveInfo"
@@ -39,14 +41,20 @@ class Ensemble(SQLAlchemyObjectType):
             return update.ensemble_reference
         return None
 
-    def resolve_response_names(root: ds.Ensemble, info: "ResolveInfo") -> Iterable[str]:
+    def resolve_unique_responses(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> Iterable[ds.Record]:
         session = info.context["session"]
-        return [
+        response_names = [
             x[0]
             for x in session.query(ds.Record.name)
             .filter_by(ensemble_pk=root.pk, record_class=ds.RecordClass.response)
             .filter(ds.Record.realization_index != None)
             .distinct()
+        ]
+        return [
+            root.records.filter_by(name=response_name)[0]
+            for response_name in response_names
         ]
 
     def resolve_responses(
@@ -58,15 +66,18 @@ class Ensemble(SQLAlchemyObjectType):
             ds.Record.name.in_(names)
         )
 
-    def resolve_parameter_names(
-        root: ds.Ensemble, info: "ResolveInfo"
-    ) -> Iterable[str]:
-        return root.inputs
-
     def resolve_parameters(
         root: ds.Ensemble, info: "ResolveInfo"
     ) -> Iterable[ds.Record]:
         return root.records.filter_by(record_class=ds.RecordClass.parameter)
+
+    def resolve_unique_parameters(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> Iterable[ds.Record]:
+        return [
+            root.records.filter_by(name=parameter_name)[0]
+            for parameter_name in root.inputs
+        ]
 
 
 class CreateEnsemble(SQLAlchemyMutation):
