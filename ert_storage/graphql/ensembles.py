@@ -1,4 +1,4 @@
-from typing import Iterable, List, Optional, TYPE_CHECKING
+from typing import List, Iterable, Optional, TYPE_CHECKING
 import graphene as gr
 from graphene_sqlalchemy.utils import get_session
 
@@ -21,7 +21,7 @@ class Ensemble(SQLAlchemyObjectType):
         gr.List("ert_storage.graphql.responses.Response"),
         names=gr.Argument(gr.List(gr.String), required=False, default_value=None),
     )
-    unique_responses = gr.List("ert_storage.graphql.responses.Response")
+    unique_responses = gr.List("ert_storage.graphql.unique_responses.UniqueResponse")
 
     parameters = gr.List("ert_storage.graphql.parameters.Parameter")
 
@@ -40,33 +40,33 @@ class Ensemble(SQLAlchemyObjectType):
 
     def resolve_unique_responses(
         root: ds.Ensemble, info: "ResolveInfo"
-    ) -> Iterable[ds.Record]:
+    ) -> Iterable[ds.RecordInfo]:
         session = info.context["session"]  # type: ignore
-        response_names = [
-            x[0]
-            for x in session.query(ds.Record.name)
-            .filter_by(ensemble_pk=root.pk, record_class=ds.RecordClass.response)
-            .filter(ds.Record.realization_index != None)
-            .distinct()
-        ]
-        return [
-            root.records.filter_by(name=response_name)[0]
-            for response_name in response_names
-        ]
+        return root.record_infos.filter_by(record_class=ds.RecordClass.response)
 
     def resolve_responses(
         root: ds.Ensemble, info: "ResolveInfo", names: Optional[Iterable[str]] = None
     ) -> Iterable[ds.Record]:
-        if names is None:
-            return root.records.filter_by(record_class=ds.RecordClass.response)
-        return root.records.filter_by(record_class=ds.RecordClass.response).filter(
-            ds.Record.name.in_(names)
+        session = info.context["session"]  # type: ignore
+        q = (
+            session.query(ds.Record)
+            .join(ds.RecordInfo)
+            .filter_by(ensemble=root, record_class=ds.RecordClass.response)
         )
+        if names is not None:
+            q = q.filter(ds.RecordInfo.name.in_(names))
+        return q.all()
 
     def resolve_parameters(
         root: ds.Ensemble, info: "ResolveInfo"
-    ) -> Iterable[ds.Prior]:
-        return root.parameters
+    ) -> Iterable[ds.Record]:
+        session = info.context["session"]  # type: ignore
+        return (
+            session.query(ds.Record)
+            .join(ds.RecordInfo)
+            .filter_by(ensemble=root, record_class=ds.RecordClass.parameter)
+            .all()
+        )
 
 
 class CreateEnsemble(SQLAlchemyMutation):
@@ -74,14 +74,14 @@ class CreateEnsemble(SQLAlchemyMutation):
         model = ds.Ensemble
 
     class Arguments:
-        parameters = gr.List(gr.String)
+        parameter_names = gr.List(gr.String)
         size = gr.Int()
 
     @staticmethod
     def mutate(
         root: Optional["Experiment"],
         info: "ResolveInfo",
-        parameters: List[str],
+        parameter_names: List[str],
         size: int,
         experiment_id: Optional[str] = None,
     ) -> ds.Ensemble:
@@ -94,7 +94,12 @@ class CreateEnsemble(SQLAlchemyMutation):
         else:
             raise ValueError("ID is required")
 
-        ensemble = ds.Ensemble(inputs=parameters, experiment=experiment, size=size)
+        ensemble = ds.Ensemble(
+            parameter_names=parameter_names,
+            response_names=[],
+            experiment=experiment,
+            size=size,
+        )
 
         db.add(ensemble)
         db.commit()

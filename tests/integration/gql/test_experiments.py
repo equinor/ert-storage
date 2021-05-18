@@ -8,7 +8,7 @@ query($id: ID!) {
     id
     ensembles {
       id
-      inputs
+      parameterNames
     }
   }
 }
@@ -37,7 +37,7 @@ CREATE_EXPERIMENT_WITH_ENSEMBLE = """\
 mutation($name: String, $size: Int!, $params: [String!]) {
   createExperiment(name: $name) {
     id
-    createEnsemble(size: $size, parameters: $params) {
+    createEnsemble(size: $size, parameterNames: $params) {
       id
     }
   }
@@ -99,7 +99,7 @@ def test_create_experiment_with_ensemble(client):
     assert r["data"]["experiment"]["id"] == eid
     assert r["data"]["experiment"]["name"] == ename
     assert len(r["data"]["experiment"]["ensembles"]) == 1
-    assert r["data"]["experiment"]["ensembles"][0]["inputs"] == eparams
+    assert r["data"]["experiment"]["ensembles"][0]["parameterNames"] == eparams
 
 
 def rand_name():

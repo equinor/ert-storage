@@ -84,7 +84,6 @@ def test_ensemble_wide_parameters(client, simple_ensemble):
     client.post(
         f"/ensembles/{ensemble_id}/records/coeffs/matrix",
         data=f"{PARAMETERS}",
-        params={"record_class": "parameter"},
     )
 
     # Fetch as ensemble-wide parameters
@@ -116,7 +115,6 @@ def test_ensemble_wide_parameters_dataframe(client, simple_ensemble, mimetype):
     client.post(
         f"/ensembles/{ensemble_id}/records/coeffs/matrix",
         data=data.to_csv(),
-        params={"record_class": "parameter"},
         headers={"content-type": mimetype},
     )
 
@@ -157,7 +155,6 @@ def test_ensemble_wide_parameters_1d(client, simple_ensemble):
     client.post(
         f"/ensembles/{ensemble_id}/records/coeffs/matrix",
         json=[1, 2, 3, 4, 5],
-        params={"record_class": "parameter"},
         check_status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     )
 
@@ -383,20 +380,17 @@ def test_blocked_blob(client, simple_ensemble):
 
 
 def test_responses(client, simple_ensemble):
-    ensemble_id = simple_ensemble()
+    ensemble_id = simple_ensemble(parameters=["rec2"], responses=["rec3"])
     records = [
-        ("rec1", "[1, 2, 3, 4, 5]", "other"),
-        ("rec2", "[[4, 3, 2, 1]]", "parameter"),
-        ("rec3", "[[1, 2], [4, 5]]", "response"),
-        ("rec4", "[[1, 2], [4, 5]]", None),
+        ("rec1", "[1, 2, 3, 4, 5]"),
+        ("rec2", "[[4, 3, 2, 1]]"),
+        ("rec3", "[[1, 2], [4, 5]]"),
+        ("rec4", "[[1, 2], [4, 5]]"),
     ]
-    for name, data, record_class in records:
+    for name, data in records:
         client.post(
             f"/ensembles/{ensemble_id}/records/{name}/matrix",
             data=data,
-            params={
-                "record_class": record_class,
-            },
         )
 
     responses = client.get(f"/ensembles/{ensemble_id}/responses").json()

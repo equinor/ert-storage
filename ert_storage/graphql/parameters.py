@@ -15,8 +15,12 @@ class Parameter(SQLAlchemyObjectType):
     class Meta:
         model = ds.Record
 
+    name = gr.String()
     prior = gr.JSONString()
 
+    def resolve_name(root: ds.Record, info: "ResolveInfo") -> str:
+        return root.name
+
     def resolve_prior(root: ds.Record, info: "ResolveInfo") -> Optional[dict]:
-        prior = root.prior
+        prior = root.record_info.prior
         return prior_to_dict(prior) if prior is not None else None

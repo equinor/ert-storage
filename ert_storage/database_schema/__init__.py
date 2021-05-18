@@ -1,5 +1,6 @@
 from .metadatafield import MetadataField
-from .record import Record, F64Matrix, File, FileBlock, RecordClass, RecordType
+from .record_info import RecordInfo, RecordType, RecordClass
+from .record import Record, F64Matrix, File, FileBlock
 from .ensemble import Ensemble
 from .experiment import Experiment
 from .observation import Observation, ObservationTransformation

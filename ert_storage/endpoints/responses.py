@@ -19,12 +19,13 @@ async def get_ensemble_response_dataframe(
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
     records = (
         db.query(ds.Record)
+        .filter(ds.Record.realization_index != None)
+        .join(ds.RecordInfo)
         .filter_by(
             ensemble_pk=ensemble.pk,
             name=response_name,
             record_class=ds.RecordClass.response,
         )
-        .filter(ds.Record.realization_index != None)
     ).all()
     df_list = []
     for record in records:
@@ -39,5 +40,5 @@ async def get_ensemble_response_dataframe(
 
     return Response(
         content=pd.concat(df_list, axis=0).to_csv().encode(),
-        media_type="application/csv",
+        media_type="text/csv",
     )
