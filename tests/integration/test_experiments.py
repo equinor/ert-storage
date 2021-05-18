@@ -93,3 +93,17 @@ def test_delete_experiment(client, create_experiment, create_ensemble):
     for obs in observations:
         resp = client.get(f"/observations/{obs['id']}", check_status_code=None)
         assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_create_ensemble_with_overlap(client, create_experiment):
+    experiment_id = create_experiment("test_ensembles")
+
+    client.post(
+        f"/experiments/{experiment_id}/ensembles",
+        json={
+            "size": 1,
+            "parameter_names": ["foo", "bar", "coeff", "qux"],
+            "response_names": ["coeff", "fopr", "fopt", "fgpt", "fgpr"],
+        },
+        check_status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+    )

@@ -7,7 +7,7 @@ import pandas as pd
 
 def test_get_response_data(client, create_experiment, create_ensemble):
     experiment_id = create_experiment("test_ensembles")
-    ensemble_id = create_ensemble(experiment_id=experiment_id)
+    ensemble_id = create_ensemble(experiment_id=experiment_id, responses=["FOPR"])
 
     # 5 realizations of 8 values each
     matrices = np.random.rand(5, 8)
@@ -26,8 +26,8 @@ def test_get_response_data(client, create_experiment, create_ensemble):
         resp = client.post(
             f"/ensembles/{ensemble_id}/records/{response_name}/matrix",
             data=data_df[id_real].to_csv().encode(),
-            headers={"content-type": "application/x-dataframe"},
-            params=dict(realization_index=id_real, record_class="response"),
+            headers={"content-type": "text/csv"},
+            params={"realization_index": id_real},
         )
 
     resp = client.get(f"/ensembles/{ensemble_id}/responses/{response_name}/data")
@@ -41,7 +41,7 @@ def test_get_response_data(client, create_experiment, create_ensemble):
 
 def test_get_response_data_with_nan(client, create_experiment, create_ensemble):
     experiment_id = create_experiment("test_ensembles")
-    ensemble_id = create_ensemble(experiment_id=experiment_id)
+    ensemble_id = create_ensemble(experiment_id=experiment_id, responses=["FOPR"])
 
     # 5 realizations of 8 values each
     matrices = np.random.rand(5, 8)
@@ -63,8 +63,8 @@ def test_get_response_data_with_nan(client, create_experiment, create_ensemble):
         resp = client.post(
             f"/ensembles/{ensemble_id}/records/{response_name}/matrix",
             data=data_df[id_real].to_csv().encode(),
-            headers={"content-type": "application/x-dataframe"},
-            params=dict(realization_index=id_real, record_class="response"),
+            headers={"content-type": "text/csv"},
+            params={"realization_index": id_real},
         )
 
     resp = client.get(f"/ensembles/{ensemble_id}/responses/{response_name}/data")

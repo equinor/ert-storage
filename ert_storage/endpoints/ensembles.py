@@ -12,11 +12,12 @@ router = APIRouter(tags=["ensemble"])
 @router.post("/experiments/{experiment_id}/ensembles", response_model=js.EnsembleOut)
 def post_ensemble(
     *, db: Session = Depends(get_db), ens_in: js.EnsembleIn, experiment_id: UUID
-) -> js.EnsembleOut:
+) -> ds.Ensemble:
 
     experiment = db.query(ds.Experiment).filter_by(id=experiment_id).one()
     ens = ds.Ensemble(
-        inputs=ens_in.parameters,
+        parameter_names=ens_in.parameter_names,
+        response_names=ens_in.response_names,
         experiment=experiment,
         size=ens_in.size,
         _metadata=ens_in.metadata,
@@ -28,25 +29,12 @@ def post_ensemble(
         update_obj.ensemble_result = ens
     db.commit()
 
-    return js.EnsembleOut(
-        id=ens.id,
-        size=ens.size,
-        children=[child.ensemble_result.id for child in ens.children],
-        parent=ens.parent.ensemble_reference.id if ens.parent else None,
-    )
+    return ens
 
 
 @router.get("/ensembles/{ensemble_id}", response_model=js.EnsembleOut)
-def get_ensemble(*, db: Session = Depends(get_db), ensemble_id: UUID) -> js.EnsembleOut:
-    ens = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-
-    return js.EnsembleOut(
-        id=ens.id,
-        size=ens.size,
-        children=[child.ensemble_result.id for child in ens.children],
-        parent=ens.parent.ensemble_reference.id if ens.parent else None,
-        experiment_id=ens.experiment.id,
-    )
+def get_ensemble(*, db: Session = Depends(get_db), ensemble_id: UUID) -> ds.Ensemble:
+    return db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
 
 @router.put("/ensembles/{ensemble_id}/metadata")

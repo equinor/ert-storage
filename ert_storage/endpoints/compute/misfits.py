@@ -1,3 +1,4 @@
+from ert_storage.database_schema.record import F64Matrix
 import numpy as np
 import pandas as pd
 from uuid import UUID
@@ -33,20 +34,25 @@ async def get_response_misfits(
     Compute univariate misfits for response(s)
     """
 
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    reponse_query = (
+    response_query = (
         db.query(ds.Record)
-        .filter_by(
-            ensemble_pk=ensemble.pk,
-            name=response_name,
-            record_type=ds.RecordType.float_vector,
-        )
         .filter(ds.Record.observations != None)
+        .join(ds.RecordInfo)
+        .filter_by(
+            name=response_name,
+            record_type=ds.RecordType.f64_matrix,
+        )
+        .join(ds.Ensemble)
+        .filter_by(id=ensemble_id)
     )
     if realization_index is not None:
-        responses = [reponse_query.filter_by(realization_index=realization_index).one()]
+        responses = [
+            response_query.filter(
+                ds.Record.realization_index == realization_index
+            ).one()
+        ]
     else:
-        responses = reponse_query.all()
+        responses = response_query.all()
 
     observation_df = None
     response_dict = {}
@@ -80,5 +86,5 @@ async def get_response_misfits(
         )
     return Response(
         content=result_df.to_csv().encode(),
-        media_type="application/x-dataframe",
+        media_type="text/csv",
     )

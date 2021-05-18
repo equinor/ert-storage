@@ -46,7 +46,7 @@ def test_get_prior_for_parameters(client, create_ensemble, make_random_priors):
     assert NUM_PARAMS_W_PRIORS < NUM_PRIORS
 
     epriors = {rand_name(): prior.dict() for prior in make_random_priors(NUM_PRIORS)}
-    eparams = [rand_name() for _ in range(NUM_PARAMS_W_PRIORS)]
+    eparams = [rand_name() for _ in range(NUM_PARAMS)]
 
     exp = client.post(
         "/experiments", json={"name": rand_name(), "priors": epriors}
@@ -61,7 +61,7 @@ def test_get_prior_for_parameters(client, create_ensemble, make_random_priors):
     ):
         client.post(
             f"/ensembles/{ensid}/records/{param}/matrix",
-            params={"record_class": "parameter", "prior_id": prior},
+            params={"prior_id": prior},
             json=np.random.rand(2, 3).tolist(),
         )
         param_to_prior[param] = prior_val
@@ -71,7 +71,6 @@ def test_get_prior_for_parameters(client, create_ensemble, make_random_priors):
     for _ in range(NUM_PARAMS_WO_PRIORS):
         resp = client.post(
             f"/ensembles/{ensid}/records/{rand_name()}/matrix",
-            params={"record_class": "parameter"},
             json=np.random.rand(2, 3).tolist(),
         )
         param_no_prior.add(resp.json()["id"])

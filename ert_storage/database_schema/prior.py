@@ -42,4 +42,3 @@ class Prior(Base, MetadataField):
         sa.Integer, sa.ForeignKey("experiment.pk"), nullable=False
     )
     experiment = relationship("Experiment")
-    parameters = relationship("Record", foreign_keys="[Record.prior_pk]")

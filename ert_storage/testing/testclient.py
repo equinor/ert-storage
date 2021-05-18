@@ -236,16 +236,12 @@ def testclient_factory() -> Generator[_TestClient, None, None]:
 
     if os.getenv("ERT_STORAGE_NO_ROLLBACK", ""):
         print(
-            "Environment variable 'ERT_STORAGE_NO_ROLLBACK' not set or empty.\n"
-            "Will perform rollbacks after every test."
-        )
-        rollback = False
-    else:
-        print(
             "Environment variable 'ERT_STORAGE_NO_ROLLBACK' is set.\n"
             "Will keep data in database."
         )
         rollback = True
+    else:
+        rollback = False
 
     from ert_storage.app import app
     from ert_storage.graphql import schema

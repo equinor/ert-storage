@@ -1,37 +1,22 @@
-from enum import Enum
-from typing import Any, Optional
+from typing import Any
+from uuid import uuid4
+
 import sqlalchemy as sa
-from ert_storage.database import Base
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
+
+from ert_storage.ext.sqlalchemy_arrays import FloatArray
 from ert_storage.ext.uuid import UUID
-from uuid import uuid4
+from ert_storage.database import Base
 
 from .metadatafield import MetadataField
 from .observation import observation_record_association
-from ert_storage.ext.sqlalchemy_arrays import FloatArray
-
-
-class RecordType(Enum):
-    float_vector = 1
-    file = 2
-
-
-class RecordClass(Enum):
-    parameter = 1
-    response = 2
-    other = 3
+from .record_info import RecordType
 
 
 class Record(Base, MetadataField):
     __tablename__ = "record"
-
-    def __init__(
-        self, *args: Any, record_type: Optional[RecordType] = None, **kwargs: Any
-    ) -> None:
-        if record_type is not None:
-            kwargs.setdefault("record_type", record_type)
-        super().__init__(*args, **kwargs)
 
     pk = sa.Column(sa.Integer, primary_key=True)
     id = sa.Column(UUID, unique=True, default=uuid4, nullable=False)
@@ -40,37 +25,40 @@ class Record(Base, MetadataField):
         sa.DateTime, server_default=func.now(), onupdate=func.now()
     )
 
-    name = sa.Column(sa.String, nullable=False)
     realization_index = sa.Column(sa.Integer, nullable=True)
-    record_type = sa.Column(sa.Enum(RecordType), nullable=False)
+
+    record_info_pk = sa.Column(
+        sa.Integer, sa.ForeignKey("record_info.pk"), nullable=True
+    )
+    record_info = relationship("RecordInfo", back_populates="records")
 
     file_pk = sa.Column(sa.Integer, sa.ForeignKey("file.pk"))
     f64_matrix_pk = sa.Column(sa.Integer, sa.ForeignKey("f64_matrix.pk"))
 
     file = relationship("File", cascade="all")
     f64_matrix = relationship("F64Matrix", cascade="all")
-    ensemble_pk = sa.Column(sa.Integer, sa.ForeignKey("ensemble.pk"), nullable=True)
-    ensemble = relationship("Ensemble", back_populates="records")
+
     observations = relationship(
         "Observation",
         secondary=observation_record_association,
         back_populates="records",
     )
-    record_class = sa.Column(sa.Enum(RecordClass))
-
-    prior_pk = sa.Column(sa.Integer, sa.ForeignKey("prior.pk"), nullable=True)
-    prior = relationship("Prior", back_populates="parameters")
 
     @property
     def data(self) -> Any:
-        if self.record_type == RecordType.file:
+        info = self.record_info
+        if info.record_type == RecordType.file:
             return self.file.content
-        elif self.record_type == RecordType.float_vector:
+        elif info.record_type == RecordType.f64_matrix:
             return self.f64_matrix.content
         else:
             raise NotImplementedError(
                 f"The record type {self.record_type} is not yet implemented"
             )
+
+    @property
+    def name(self) -> str:
+        return self.record_info.name
 
 
 class File(Base):

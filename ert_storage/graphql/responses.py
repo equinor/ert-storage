@@ -12,3 +12,8 @@ if TYPE_CHECKING:
 class Response(SQLAlchemyObjectType):
     class Meta:
         model = ds.Record
+
+    name = gr.String()
+
+    def resolve_name(root: ds.Record, info: "ResolveInfo") -> str:
+        return root.name

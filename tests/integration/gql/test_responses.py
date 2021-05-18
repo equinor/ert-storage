@@ -35,16 +35,16 @@ query($id: ID!, $names: [String!]!) {
 """
 
 RESPONSE_NAMES = [
-    {"name": "FOPR"},
-    {"name": "FOPT"},
-    {"name": "FGPT"},
-    {"name": "FGPR"},
+    "FOPR",
+    "FOPT",
+    "FGPT",
+    "FGPR",
 ]
 
 
 def test_get_gql_response(client, create_experiment, create_ensemble):
     experiment_id = create_experiment("test_ensembles")
-    ensemble_id = create_ensemble(experiment_id=experiment_id)
+    ensemble_id = create_ensemble(experiment_id=experiment_id, responses=RESPONSE_NAMES)
 
     # 5 realizations of 8 values each
     matrices = np.random.rand(5, 8)
@@ -62,17 +62,17 @@ def test_get_gql_response(client, create_experiment, create_ensemble):
     for id_real in data_df:
         [
             client.post(
-                f"/ensembles/{ensemble_id}/records/{resp_name['name']}/matrix",
+                f"/ensembles/{ensemble_id}/records/{resp_name}/matrix",
                 data=data_df[id_real].to_csv().encode(),
                 headers={"content-type": "application/x-dataframe"},
-                params=dict(realization_index=id_real, record_class="response"),
+                params={"realization_index": id_real},
             )
             for resp_name in RESPONSE_NAMES
         ]
 
     r = client.gql_execute(GET_UNIQUE_RESPONSES, variable_values={"id": ensemble_id})
-    for response_name in RESPONSE_NAMES:
-        assert response_name in r["data"]["ensemble"]["uniqueResponses"]
+    for response in r["data"]["ensemble"]["uniqueResponses"]:
+        assert response["name"] in RESPONSE_NAMES
 
     # retrieve all responses and realizations
     r = client.gql_execute(GET_ALL_RESPONSES, variable_values={"id": ensemble_id})
@@ -80,9 +80,9 @@ def test_get_gql_response(client, create_experiment, create_ensemble):
     assert len(r["data"]["ensemble"]["responses"]) == len(RESPONSE_NAMES) * 5
     for id_real, _ in enumerate(matrices):
         for response_name in RESPONSE_NAMES:
-            assert {"name": response_name["name"], "realizationIndex": id_real} in r[
-                "data"
-            ]["ensemble"]["responses"]
+            assert {"name": response_name, "realizationIndex": id_real} in r["data"][
+                "ensemble"
+            ]["responses"]
 
     # use names attribute to retrieve only FOPR and FOPT realizations
     r = client.gql_execute(

@@ -18,6 +18,7 @@ from fastapi import (
 )
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.attributes import flag_modified
 from ert_storage.database import Session, get_db, HAS_AZURE_BLOB_STORAGE, BLOB_CONTAINER
@@ -66,16 +67,14 @@ async def post_ensemble_record_file(
         file_obj.content = await file.read()
 
     db.add(file_obj)
-    record_obj = ds.Record(
-        name=name,
-        record_type=ds.RecordType.file,
+    _create_record(
+        db,
+        ensemble,
+        name,
+        ds.RecordType.file,
         realization_index=realization_index,
         file=file_obj,
-        record_class=ds.RecordClass.other,
     )
-
-    record_obj.ensemble = ensemble
-    db.add(record_obj)
 
 
 @router.put("/ensembles/{ensemble_id}/records/{name}/blob")
@@ -105,9 +104,9 @@ async def add_block(
 
     record_obj = (
         db.query(ds.Record)
-        .filter_by(
-            ensemble_pk=ensemble.pk, name=name, realization_index=realization_index
-        )
+        .filter_by(realization_index=realization_index)
+        .join(ds.RecordInfo)
+        .filter_by(ensemble_pk=ensemble.pk, name=name)
         .one()
     )
     if HAS_AZURE_BLOB_STORAGE:
@@ -147,16 +146,15 @@ async def create_blob(
         pass
 
     db.add(file_obj)
-    record_obj = ds.Record(
-        name=name,
-        record_type=ds.RecordType.file,
+
+    _create_record(
+        db,
+        ensemble,
+        name,
+        ds.RecordType.file,
         realization_index=realization_index,
         file=file_obj,
-        record_class=ds.RecordClass.other,
     )
-
-    record_obj.ensemble = ensemble
-    db.add(record_obj)
 
 
 @router.patch("/ensembles/{ensemble_id}/records/{name}/blob")
@@ -175,9 +173,9 @@ async def finalize_blob(
 
     record_obj = (
         db.query(ds.Record)
-        .filter_by(
-            ensemble_pk=ensemble.pk, name=name, realization_index=realization_index
-        )
+        .filter_by(realization_index=realization_index)
+        .join(ds.RecordInfo)
+        .filter_by(ensemble_pk=ensemble.pk, name=name)
         .one()
     )
 
@@ -214,7 +212,6 @@ async def post_ensemble_record_matrix(
     name: str,
     realization_index: Optional[int] = None,
     content_type: str = Header("application/json"),
-    record_class: Optional[str] = None,
     prior_id: Optional[UUID] = None,
     request: Request,
 ) -> js.RecordOut:
@@ -227,7 +224,10 @@ async def post_ensemble_record_matrix(
         )
         content_type = "text/csv"
 
-    if prior_id is not None and record_class != "parameter":
+    ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
+    is_parameter = name in ensemble.parameter_names
+    is_response = name in ensemble.response_names
+    if prior_id is not None and not is_parameter:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
@@ -238,7 +238,7 @@ async def post_ensemble_record_matrix(
                 "prior_id": str(prior_id),
             },
         )
-    ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
+
     labels = None
     prior = (
         (
@@ -283,13 +283,9 @@ async def post_ensemble_record_matrix(
                 "realization_index": realization_index,
             },
         )
-    if not record_class:
-        record_class_enum = ds.RecordClass.other
-    else:
-        record_class_enum = ds.RecordClass.__members__[record_class]
 
     # Require that the dimensionality of an ensemble-wide parameter matrix is at least 2
-    if realization_index is None and record_class_enum == ds.RecordClass.parameter:
+    if realization_index is None and is_parameter:
         if content.ndim <= 1:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -305,18 +301,22 @@ async def post_ensemble_record_matrix(
     matrix_obj = ds.F64Matrix(content=content.tolist(), labels=labels)
     db.add(matrix_obj)
 
-    record_obj = ds.Record(
-        name=name,
-        record_type=ds.RecordType.float_vector,
+    record_class = ds.RecordClass.other
+    if is_parameter:
+        record_class = ds.RecordClass.parameter
+    if is_response:
+        record_class = ds.RecordClass.response
+
+    return _create_record(
+        db,
+        ensemble,
+        name,
+        ds.RecordType.f64_matrix,
+        record_class,
+        prior,
         f64_matrix=matrix_obj,
         realization_index=realization_index,
-        record_class=record_class_enum,
-        prior=prior,
     )
-    record_obj.ensemble = ensemble
-    db.add(record_obj)
-    db.commit()
-    return record_obj
 
 
 @router.put("/ensembles/{ensemble_id}/records/{name}/metadata")
@@ -558,10 +558,9 @@ async def get_ensemble_record(
             bundle = _get_ensemble_record(db, ensemble_id, name)
 
             # Only parameter records can be "up-casted" to ensemble-wide
-            if (
-                bundle.record_type != ds.RecordType.float_vector
-                or bundle.record_class != ds.RecordClass.parameter
-            ):
+            is_matrix = bundle.record_info.record_type == ds.RecordType.f64_matrix
+            is_parameter = name in bundle.record_info.ensemble.parameter_names
+            if not is_matrix or not is_parameter:
                 raise exc
     return await _get_record_data(bundle, accept, realization_index)
 
@@ -571,7 +570,7 @@ async def get_ensemble_parameters(
     *, db: Session = Depends(get_db), ensemble_id: UUID
 ) -> List[str]:
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    return ensemble.inputs
+    return ensemble.parameter_names
 
 
 @router.get(
@@ -579,18 +578,22 @@ async def get_ensemble_parameters(
 )
 async def get_ensemble_records(
     *, db: Session = Depends(get_db), ensemble_id: UUID
-) -> Mapping[str, js.RecordOut]:
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+) -> Mapping[str, ds.Record]:
     return {
-        rec.name: js.RecordOut(id=rec.id, name=rec.name, metadata=rec.metadata_dict)
-        for rec in ensemble.records
+        rec.name: rec
+        for rec in (
+            db.query(ds.Record)
+            .join(ds.RecordInfo)
+            .join(ds.Ensemble)
+            .filter_by(id=ensemble_id)
+            .all()
+        )
     }
 
 
 @router.get("/records/{record_id}", response_model=js.RecordOut)
-async def get_record(*, db: Session = Depends(get_db), record_id: UUID) -> js.RecordOut:
-    rec = db.query(ds.Record).filter_by(id=record_id).one()
-    return js.RecordOut(id=rec.id, name=rec.name, metadata=rec.metadata_dict)
+async def get_record(*, db: Session = Depends(get_db), record_id: UUID) -> ds.Record:
+    return db.query(ds.Record).filter_by(id=record_id).one()
 
 
 @router.get("/records/{record_id}/data")
@@ -615,12 +618,17 @@ async def get_record_data(
 )
 def get_ensemble_responses(
     *, db: Session = Depends(get_db), ensemble_id: UUID
-) -> Mapping[str, js.RecordOut]:
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+) -> Mapping[str, ds.Record]:
     return {
-        rec.name: js.RecordOut(id=rec.id, name=rec.name, metadata=rec.metadata_dict)
-        for rec in ensemble.records
-        if rec.record_class == ds.RecordClass.response
+        rec.name: rec
+        for rec in (
+            db.query(ds.Record)
+            .join(ds.RecordInfo)
+            .filter_by(record_class=ds.RecordClass.response)
+            .join(ds.Ensemble)
+            .filter_by(id=ensemble_id)
+            .all()
+        )
     }
 
 
@@ -629,12 +637,11 @@ def _get_ensemble_record(db: Session, ensemble_id: UUID, name: str) -> ds.Record
         ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
         return (
             db.query(ds.Record)
-            .filter(
-                sa.and_(
-                    ds.Record.ensemble_pk == ensemble.pk,
-                    ds.Record.name == name,
-                    ds.Record.realization_index == None,
-                )
+            .filter_by(realization_index=None)
+            .join(ds.RecordInfo)
+            .filter_by(
+                ensemble_pk=ensemble.pk,
+                name=name,
             )
             .one()
         )
@@ -656,12 +663,11 @@ def _get_forward_model_record(
         ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
         return (
             db.query(ds.Record)
-            .filter(
-                sa.and_(
-                    ds.Record.ensemble_pk == ensemble.pk,
-                    ds.Record.name == name,
-                    ds.Record.realization_index == realization_index,
-                )
+            .filter_by(realization_index=realization_index)
+            .join(ds.RecordInfo)
+            .filter_by(
+                ensemble_pk=ensemble.pk,
+                name=name,
             )
             .one()
         )
@@ -684,7 +690,11 @@ def _get_and_assert_ensemble(
     """
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
-    q = db.query(ds.Record).filter_by(ensemble_pk=ensemble.pk, name=name)
+    q = (
+        db.query(ds.Record)
+        .join(ds.RecordInfo)
+        .filter_by(ensemble_pk=ensemble.pk, name=name)
+    )
     if realization_index is not None:
         if realization_index not in range(ensemble.size) and ensemble.size != -1:
             raise HTTPException(
@@ -720,8 +730,8 @@ def _get_and_assert_ensemble(
 async def _get_record_data(
     record: ds.Record, accept: Optional[str], realization_index: Optional[int] = None
 ) -> Response:
-    type_ = record.record_type
-    if type_ == ds.RecordType.float_vector:
+    type_ = record.record_info.record_type
+    if type_ == ds.RecordType.f64_matrix:
         if realization_index is None:
             content = record.f64_matrix.content
         else:
@@ -782,3 +792,65 @@ async def _get_record_data(
     raise NotImplementedError(
         f"Getting record data for type {type_} and Accept header {accept} not implemented"
     )
+
+
+def _create_record(
+    db: Session,
+    ensemble: ds.Ensemble,
+    name: str,
+    record_type: ds.RecordType,
+    record_class: ds.RecordClass = ds.RecordClass.other,
+    prior: Optional[ds.Prior] = None,
+    **kwargs: Any,
+) -> ds.Record:
+    record_info = ds.RecordInfo(
+        ensemble=ensemble,
+        name=name,
+        record_class=record_class,
+        record_type=record_type,
+        prior=prior,
+    )
+    record = ds.Record(record_info=record_info, **kwargs)
+
+    nested = db.begin_nested()
+    try:
+        db.add(record)
+        db.commit()
+    except IntegrityError:
+        # Assuming this is a UNIQUE constraint failure due to an existing
+        # record_info with the same name and ensemble. Try to fetch the
+        # record_info
+        nested.rollback()
+        old_record_info = (
+            db.query(ds.RecordInfo).filter_by(ensemble=ensemble, name=name).one()
+        )
+
+        # Check that the parameters match
+        if record_info.record_class != old_record_info.record_class:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "Record class of new record does not match previous record class",
+                    "new_record_class": str(record_info.record_class),
+                    "old_record_class": str(old_record_info.record_class),
+                    "name": name,
+                    "ensemble_id": str(ensemble.id),
+                },
+            )
+        if record_info.record_type != old_record_info.record_type:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "Record type of new record does not match previous record type",
+                    "new_record_type": str(record_info.record_type),
+                    "old_record_type": str(old_record_info.record_type),
+                    "name": name,
+                    "ensemble_id": str(ensemble.id),
+                },
+            )
+
+        record = ds.Record(record_info=old_record_info, **kwargs)
+        db.add(record)
+        db.commit()
+
+    return record

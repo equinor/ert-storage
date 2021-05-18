@@ -7,14 +7,14 @@ query($id: ID!) {
   ensemble(id: $id) {
     id
     size
-    inputs
+    parameterNames
   }
 }
 """
 
 CREATE_ENSEMBLE = """\
 mutation create($experimentId: ID!, $size: Int!, $params: [String]) {
-  createEnsemble(experimentId: $experimentId, size: $size, parameters: $params) {
+  createEnsemble(experimentId: $experimentId, size: $size, parameterNames: $params) {
     id
   }
 }
@@ -27,7 +27,7 @@ def test_get_ensemble(client, simple_ensemble):
     r = client.gql_execute(GET_ENSEMBLE, variable_values={"id": eid})
 
     assert r["data"]["ensemble"]["id"] == str(eid)
-    assert r["data"]["ensemble"]["inputs"] == eparams
+    assert r["data"]["ensemble"]["parameterNames"] == eparams
 
 
 def test_create_ensemble(client, create_experiment):
@@ -48,7 +48,7 @@ def test_create_ensemble(client, create_experiment):
     r = client.gql_execute(GET_ENSEMBLE, variable_values={"id": eid})
 
     assert r["data"]["ensemble"]["id"] == eid
-    assert r["data"]["ensemble"]["inputs"] == eparams
+    assert r["data"]["ensemble"]["parameterNames"] == eparams
     assert r["data"]["ensemble"]["size"] == ensemble_size
 
 
