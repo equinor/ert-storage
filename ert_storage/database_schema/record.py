@@ -30,7 +30,7 @@ class Record(Base, MetadataField):
         self, *args: Any, record_type: Optional[RecordType] = None, **kwargs: Any
     ) -> None:
         if record_type is not None:
-            kwargs.setdefault("_record_type", record_type.value)
+            kwargs.setdefault("record_type", record_type)
         super().__init__(*args, **kwargs)
 
     pk = sa.Column(sa.Integer, primary_key=True)
@@ -42,7 +42,7 @@ class Record(Base, MetadataField):
 
     name = sa.Column(sa.String, nullable=False)
     realization_index = sa.Column(sa.Integer, nullable=True)
-    _record_type = sa.Column("record_type", sa.Integer, nullable=False)
+    record_type = sa.Column(sa.Enum(RecordType), nullable=False)
 
     file_pk = sa.Column(sa.Integer, sa.ForeignKey("file.pk"))
     f64_matrix_pk = sa.Column(sa.Integer, sa.ForeignKey("f64_matrix.pk"))
@@ -60,14 +60,6 @@ class Record(Base, MetadataField):
 
     prior_pk = sa.Column(sa.Integer, sa.ForeignKey("prior.pk"), nullable=True)
     prior = relationship("Prior", back_populates="parameters")
-
-    @property
-    def record_type(self) -> RecordType:
-        return RecordType(self._record_type)
-
-    @record_type.setter
-    def record_type(self, other: RecordType) -> None:
-        self._record_type = other.value
 
     @property
     def data(self) -> Any:
