@@ -59,7 +59,7 @@ class Record(Base, MetadataField):
     record_class = sa.Column(sa.Enum(RecordClass))
 
     prior_pk = sa.Column(sa.Integer, sa.ForeignKey("prior.pk"), nullable=True)
-    prior = relationship("Prior")
+    prior = relationship("Prior", back_populates="parameters")
 
     @property
     def record_type(self) -> RecordType:
