@@ -26,9 +26,11 @@ class Experiment(Base, MetadataField):
         "Observation",
         foreign_keys="[Observation.experiment_pk]",
         cascade="all, delete-orphan",
+        back_populates="experiment",
     )
     priors = relationship(
         "Prior",
         foreign_keys="[Prior.experiment_pk]",
         cascade="all, delete-orphan",
+        back_populates="experiment",
     )
