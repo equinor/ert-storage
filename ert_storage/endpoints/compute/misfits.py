@@ -39,7 +39,7 @@ async def get_response_misfits(
         .filter_by(
             ensemble_pk=ensemble.pk,
             name=response_name,
-            _record_type=1,
+            record_type=ds.RecordType.float_vector,
         )
         .filter(ds.Record.observations != None)
     )
