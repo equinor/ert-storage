@@ -17,7 +17,12 @@ class Ensemble(SQLAlchemyObjectType):
 
     child_ensembles = gr.List(lambda: Ensemble)
     parent_ensemble = gr.Field(lambda: Ensemble)
-    responses = gr.Field("ert_storage.graphql.responses.Response")
+    responses = gr.Field(
+        gr.List("ert_storage.graphql.responses.Response"),
+        names=gr.Argument(gr.List(gr.String), required=False, default_value=None),
+    )
+    unique_responses = gr.List("ert_storage.graphql.responses.Response")
+
     parameters = gr.List("ert_storage.graphql.parameters.Parameter")
 
     def resolve_child_ensembles(
@@ -32,6 +37,31 @@ class Ensemble(SQLAlchemyObjectType):
         if update is not None:
             return update.ensemble_reference
         return None
+
+    def resolve_unique_responses(
+        root: ds.Ensemble, info: "ResolveInfo"
+    ) -> Iterable[ds.Record]:
+        session = info.context["session"]  # type: ignore
+        response_names = [
+            x[0]
+            for x in session.query(ds.Record.name)
+            .filter_by(ensemble_pk=root.pk, record_class=ds.RecordClass.response)
+            .filter(ds.Record.realization_index != None)
+            .distinct()
+        ]
+        return [
+            root.records.filter_by(name=response_name)[0]
+            for response_name in response_names
+        ]
+
+    def resolve_responses(
+        root: ds.Ensemble, info: "ResolveInfo", names: Optional[Iterable[str]] = None
+    ) -> Iterable[ds.Record]:
+        if names is None:
+            return root.records.filter_by(record_class=ds.RecordClass.response)
+        return root.records.filter_by(record_class=ds.RecordClass.response).filter(
+            ds.Record.name.in_(names)
+        )
 
     def resolve_parameters(
         root: ds.Ensemble, info: "ResolveInfo"
