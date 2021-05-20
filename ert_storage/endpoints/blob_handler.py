@@ -57,8 +57,32 @@ class GeneralBlobHandler:
         return file_obj
 
     async def finalize_blob(
-        self, record_obj: ds.Record, submitted_blocks: List[ds.FileBlock]
+        self,
+        db: Session,
+        ensemble_id: UUID,
+        name: str,
+        realization_index: Optional[int],
     ) -> None:
+        ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+
+        record_obj = (
+            db.query(ds.Record)
+            .filter_by(realization_index=realization_index)
+            .join(ds.RecordInfo)
+            .filter_by(ensemble_pk=ensemble.pk, name=name)
+            .one()
+        )
+
+        submitted_blocks = list(
+            db.query(ds.FileBlock)
+            .filter_by(
+                record_name=name,
+                ensemble_pk=ensemble.pk,
+                realization_index=realization_index,
+            )
+            .all()
+        )
+
         data = b"".join([block.content for block in submitted_blocks])
         record_obj.file.content = data
 
@@ -131,8 +155,32 @@ class AzureBlobHandler(GeneralBlobHandler):
         return file_obj
 
     async def finalize_blob(
-        self, record_obj: ds.Record, submitted_blocks: List[ds.FileBlock]
+        self,
+        db: Session,
+        ensemble_id: UUID,
+        name: str,
+        realization_index: Optional[int],
     ) -> None:
+        ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+
+        record_obj = (
+            db.query(ds.Record)
+            .filter_by(realization_index=realization_index)
+            .join(ds.RecordInfo)
+            .filter_by(ensemble_pk=ensemble.pk, name=name)
+            .one()
+        )
+
+        submitted_blocks = list(
+            db.query(ds.FileBlock)
+            .filter_by(
+                record_name=name,
+                ensemble_pk=ensemble.pk,
+                realization_index=realization_index,
+            )
+            .all()
+        )
+
         key = record_obj.file.az_blob
         blob = azure_blob_container.get_blob_client(key)
         block_ids = [

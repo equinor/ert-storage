@@ -130,28 +130,8 @@ async def finalize_blob(
     Commit all staged blocks to a blob record
     """
 
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-
-    record_obj = (
-        db.query(ds.Record)
-        .filter_by(realization_index=realization_index)
-        .join(ds.RecordInfo)
-        .filter_by(ensemble_pk=ensemble.pk, name=name)
-        .one()
-    )
-
-    submitted_blocks = list(
-        db.query(ds.FileBlock)
-        .filter_by(
-            record_name=name,
-            ensemble_pk=ensemble.pk,
-            realization_index=realization_index,
-        )
-        .all()
-    )
-
     await blob_handler.finalize_blob(
-        record_obj=record_obj, submitted_blocks=submitted_blocks
+        db=db, ensemble_id=ensemble_id, name=name, realization_index=realization_index
     )
 
 
