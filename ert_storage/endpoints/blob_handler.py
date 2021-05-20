@@ -65,26 +65,48 @@ class GeneralBlobHandler:
     ) -> None:
         ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
-        record_obj = (
-            db.query(ds.Record)
-            .filter_by(realization_index=realization_index)
-            .join(ds.RecordInfo)
-            .filter_by(ensemble_pk=ensemble.pk, name=name)
-            .one()
+        record_obj = GeneralBlobHandler._get_record(
+            db=db,
+            name=name,
+            ensemble_pk=ensemble.pk,
+            realization_index=realization_index,
         )
 
-        submitted_blocks = list(
-            db.query(ds.FileBlock)
-            .filter_by(
-                record_name=name,
-                ensemble_pk=ensemble.pk,
-                realization_index=realization_index,
-            )
-            .all()
+        submitted_blocks = GeneralBlobHandler._get_submitted_blocks(
+            db=db,
+            name=name,
+            ensemble_pk=ensemble.pk,
+            realization_index=realization_index,
         )
 
         data = b"".join([block.content for block in submitted_blocks])
         record_obj.file.content = data
+
+    @staticmethod
+    def _get_record(
+        db: Session, name: str, ensemble_pk: int, realization_index: Optional[int]
+    ) -> ds.Record:
+        return (
+            db.query(ds.Record)
+            .filter_by(realization_index=realization_index)
+            .join(ds.RecordInfo)
+            .filter_by(ensemble_pk=ensemble_pk, name=name)
+            .one()
+        )
+
+    @staticmethod
+    def _get_submitted_blocks(
+        db: Session, name: str, ensemble_pk: int, realization_index: Optional[int]
+    ) -> List[ds.FileBlock]:
+        return list(
+            db.query(ds.FileBlock)
+            .filter_by(
+                record_name=name,
+                ensemble_pk=ensemble_pk,
+                realization_index=realization_index,
+            )
+            .all()
+        )
 
 
 class AzureBlobHandler(GeneralBlobHandler):
@@ -118,12 +140,11 @@ class AzureBlobHandler(GeneralBlobHandler):
     ) -> ds.FileBlock:
         ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
-        record_obj = (
-            db.query(ds.Record)
-            .filter_by(realization_index=realization_index)
-            .join(ds.RecordInfo)
-            .filter_by(ensemble_pk=ensemble.pk, name=name)
-            .one()
+        record_obj = GeneralBlobHandler._get_record(
+            db=db,
+            name=name,
+            ensemble_pk=ensemble.pk,
+            realization_index=realization_index,
         )
 
         key = record_obj.file.az_blob
@@ -163,22 +184,18 @@ class AzureBlobHandler(GeneralBlobHandler):
     ) -> None:
         ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
-        record_obj = (
-            db.query(ds.Record)
-            .filter_by(realization_index=realization_index)
-            .join(ds.RecordInfo)
-            .filter_by(ensemble_pk=ensemble.pk, name=name)
-            .one()
+        record_obj = GeneralBlobHandler._get_record(
+            db=db,
+            name=name,
+            ensemble_pk=ensemble.pk,
+            realization_index=realization_index,
         )
 
-        submitted_blocks = list(
-            db.query(ds.FileBlock)
-            .filter_by(
-                record_name=name,
-                ensemble_pk=ensemble.pk,
-                realization_index=realization_index,
-            )
-            .all()
+        submitted_blocks = GeneralBlobHandler._get_submitted_blocks(
+            db=db,
+            name=name,
+            ensemble_pk=ensemble.pk,
+            realization_index=realization_index,
         )
 
         key = record_obj.file.az_blob
