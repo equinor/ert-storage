@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from fastapi import UploadFile, Request
 from uuid import uuid4
 
@@ -32,6 +32,12 @@ class GeneralBlobHandler:
         self, name: str, realization_index: Optional[int], file_obj: ds.File
     ) -> None:
         pass
+
+    async def finalize_blob(
+        self, record_obj: ds.Record, submitted_blocks: List[ds.FileBlock]
+    ) -> None:
+        data = b"".join([block.content for block in submitted_blocks])
+        record_obj.file.content = data
 
 
 class AzureBlobHandler(GeneralBlobHandler):
@@ -67,6 +73,17 @@ class AzureBlobHandler(GeneralBlobHandler):
         blob = azure_blob_container.get_blob_client(key)
         file_obj.az_container = (azure_blob_container.container_name,)
         file_obj.az_blob = (key,)
+
+    async def finalize_blob(
+        self, record_obj: ds.Record, submitted_blocks: List[ds.FileBlock]
+    ) -> None:
+        key = record_obj.file.az_blob
+        blob = azure_blob_container.get_blob_client(key)
+        block_ids = [
+            block.block_id
+            for block in sorted(submitted_blocks, key=lambda x: x.block_index)
+        ]
+        await blob.commit_block_list(block_ids)
 
 
 def get_handler() -> GeneralBlobHandler:

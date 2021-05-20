@@ -181,17 +181,9 @@ async def finalize_blob(
         .all()
     )
 
-    if HAS_AZURE_BLOB_STORAGE:
-        key = record_obj.file.az_blob
-        blob = azure_blob_container.get_blob_client(key)
-        block_ids = [
-            block.block_id
-            for block in sorted(submitted_blocks, key=lambda x: x.block_index)
-        ]
-        await blob.commit_block_list(block_ids)
-    else:
-        data = b"".join([block.content for block in submitted_blocks])
-        record_obj.file.content = data
+    await blob_handler.finalize_blob(
+        record_obj=record_obj, submitted_blocks=submitted_blocks
+    )
 
 
 @router.post(
