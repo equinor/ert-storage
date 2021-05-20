@@ -103,12 +103,13 @@ async def add_block(
         .filter_by(ensemble_pk=ensemble.pk, name=name)
         .one()
     )
-    if HAS_AZURE_BLOB_STORAGE:
-        key = record_obj.file.az_blob
-        blob = azure_blob_container.get_blob_client(key)
-        await blob.stage_block(block_id, await request.body())
-    else:
-        file_block_obj.content = await request.body()
+
+    await blob_handler.stage_blob(
+        file_block_obj=file_block_obj,
+        request=request,
+        record_obj=record_obj,
+        block_id=block_id,
+    )
 
     db.add(file_block_obj)
     db.commit()

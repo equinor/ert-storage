@@ -1,6 +1,5 @@
 from typing import Optional
-
-from fastapi import UploadFile
+from fastapi import UploadFile, Request
 from uuid import uuid4
 
 from ert_storage.database import HAS_AZURE_BLOB_STORAGE
@@ -20,6 +19,15 @@ class GeneralBlobHandler:
     ) -> None:
         file_obj.content = await file.read()
 
+    async def stage_blob(
+        self,
+        file_block_obj: ds.FileBlock,
+        request: Request,
+        record_obj: ds.Record,
+        block_id: str,
+    ) -> None:
+        file_block_obj.content = await request.body()
+
 
 class AzureBlobHandler(GeneralBlobHandler):
     async def upload_blob(
@@ -35,6 +43,17 @@ class AzureBlobHandler(GeneralBlobHandler):
 
         file_obj.az_container = azure_blob_container.container_name
         file_obj.az_blob = key
+
+    async def stage_blob(
+        self,
+        file_block_obj: ds.FileBlock,
+        request: Request,
+        record_obj: ds.Record,
+        block_id: str,
+    ) -> None:
+        key = record_obj.file.az_blob
+        blob = azure_blob_container.get_blob_client(key)
+        await blob.stage_block(block_id, await request.body())
 
 
 def get_handler() -> GeneralBlobHandler:
