@@ -51,13 +51,8 @@ async def post_ensemble_record_file(
     """
     ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
 
-    file_obj = ds.File(
-        filename=file.filename,
-        mimetype=file.content_type,
-    )
-
-    await blob_handler.upload_blob(
-        file_obj=file_obj, file=file, name=name, realization_index=realization_index
+    file_obj = await blob_handler.upload_blob(
+        file=file, name=name, realization_index=realization_index
     )
 
     db.add(file_obj)

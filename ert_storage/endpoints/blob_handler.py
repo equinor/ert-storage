@@ -12,12 +12,17 @@ if HAS_AZURE_BLOB_STORAGE:
 class GeneralBlobHandler:
     async def upload_blob(
         self,
-        file_obj: ds.File,
         file: UploadFile,
         name: str,
         realization_index: Optional[int],
-    ) -> None:
+    ) -> ds.File:
+        file_obj = ds.File(
+            filename=file.filename,
+            mimetype=file.content_type,
+        )
         file_obj.content = await file.read()
+
+        return file_obj
 
     async def stage_blob(
         self,
@@ -43,17 +48,22 @@ class GeneralBlobHandler:
 class AzureBlobHandler(GeneralBlobHandler):
     async def upload_blob(
         self,
-        file_obj: ds.File,
         file: UploadFile,
         name: str,
         realization_index: Optional[int],
-    ) -> None:
+    ) -> ds.File:
+        file_obj = ds.File(
+            filename=file.filename,
+            mimetype=file.content_type,
+        )
         key = f"{name}@{realization_index}@{uuid4()}"
         blob = azure_blob_container.get_blob_client(key)
         await blob.upload_blob(file.file)
 
         file_obj.az_container = azure_blob_container.container_name
         file_obj.az_blob = key
+
+        return file_obj
 
     async def stage_blob(
         self,
