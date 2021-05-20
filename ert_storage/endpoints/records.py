@@ -103,16 +103,8 @@ async def create_blob(
     """
     Create a record which points to a blob on Azure Blob Storage.
     """
-
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    file_obj = ds.File(
-        filename="test",
-        mimetype="mime/type",
-    )
-
-    blob_handler.create_blob(
-        name=name, realization_index=realization_index, file_obj=file_obj
-    )
+    file_obj = blob_handler.create_blob(name=name, realization_index=realization_index)
 
     db.add(file_obj)
 

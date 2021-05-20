@@ -48,10 +48,13 @@ class GeneralBlobHandler:
 
         return file_block_obj
 
-    def create_blob(
-        self, name: str, realization_index: Optional[int], file_obj: ds.File
-    ) -> None:
-        pass
+    def create_blob(self, name: str, realization_index: Optional[int]) -> ds.File:
+        file_obj = ds.File(
+            filename="test",
+            mimetype="mime/type",
+        )
+
+        return file_obj
 
     async def finalize_blob(
         self, record_obj: ds.Record, submitted_blocks: List[ds.FileBlock]
@@ -114,13 +117,18 @@ class AzureBlobHandler(GeneralBlobHandler):
         )
         return file_block_obj
 
-    def create_blob(
-        self, name: str, realization_index: Optional[int], file_obj: ds.File
-    ) -> None:
+    def create_blob(self, name: str, realization_index: Optional[int]) -> ds.File:
         key = f"{name}@{realization_index}@{uuid4()}"
         blob = azure_blob_container.get_blob_client(key)
+
+        file_obj = ds.File(
+            filename="test",
+            mimetype="mime/type",
+        )
         file_obj.az_container = (azure_blob_container.container_name,)
         file_obj.az_blob = (key,)
+
+        return file_obj
 
     async def finalize_blob(
         self, record_obj: ds.Record, submitted_blocks: List[ds.FileBlock]
