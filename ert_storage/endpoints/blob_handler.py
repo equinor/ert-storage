@@ -1,9 +1,10 @@
 from typing import Optional, List
 from fastapi import UploadFile, Request
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from ert_storage.database import HAS_AZURE_BLOB_STORAGE
 from ert_storage import database_schema as ds
+from ert_storage.database import Session
 
 if HAS_AZURE_BLOB_STORAGE:
     from ert_storage.database import azure_blob_container
@@ -26,12 +27,26 @@ class GeneralBlobHandler:
 
     async def stage_blob(
         self,
-        file_block_obj: ds.FileBlock,
+        db: Session,
+        ensemble_id: UUID,
+        name: str,
+        realization_index: Optional[int],
         request: Request,
-        record_obj: ds.Record,
-        block_id: str,
-    ) -> None:
+        block_index: int,
+    ) -> ds.FileBlock:
+        ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+        block_id = str(uuid4())
+
+        file_block_obj = ds.FileBlock(
+            ensemble=ensemble,
+            block_id=block_id,
+            block_index=block_index,
+            record_name=name,
+            realization_index=realization_index,
+        )
         file_block_obj.content = await request.body()
+
+        return file_block_obj
 
     def create_blob(
         self, name: str, realization_index: Optional[int], file_obj: ds.File
@@ -67,14 +82,37 @@ class AzureBlobHandler(GeneralBlobHandler):
 
     async def stage_blob(
         self,
-        file_block_obj: ds.FileBlock,
+        db: Session,
+        ensemble_id: UUID,
+        name: str,
+        realization_index: Optional[int],
         request: Request,
-        record_obj: ds.Record,
-        block_id: str,
-    ) -> None:
+        block_index: int,
+    ) -> ds.FileBlock:
+        ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
+
+        record_obj = (
+            db.query(ds.Record)
+            .filter_by(realization_index=realization_index)
+            .join(ds.RecordInfo)
+            .filter_by(ensemble_pk=ensemble.pk, name=name)
+            .one()
+        )
+
         key = record_obj.file.az_blob
         blob = azure_blob_container.get_blob_client(key)
+
+        block_id = str(uuid4())
         await blob.stage_block(block_id, await request.body())
+
+        file_block_obj = ds.FileBlock(
+            ensemble=ensemble,
+            block_id=block_id,
+            block_index=block_index,
+            record_name=name,
+            realization_index=realization_index,
+        )
+        return file_block_obj
 
     def create_blob(
         self, name: str, realization_index: Optional[int], file_obj: ds.File

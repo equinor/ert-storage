@@ -79,31 +79,13 @@ async def add_block(
     """
     Stage blocks to an existing azure blob record.
     """
-
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    block_id = str(uuid4())
-
-    file_block_obj = ds.FileBlock(
-        ensemble=ensemble,
-        block_id=block_id,
-        block_index=block_index,
-        record_name=name,
+    file_block_obj = await blob_handler.stage_blob(
+        db=db,
+        ensemble_id=ensemble_id,
+        name=name,
         realization_index=realization_index,
-    )
-
-    record_obj = (
-        db.query(ds.Record)
-        .filter_by(realization_index=realization_index)
-        .join(ds.RecordInfo)
-        .filter_by(ensemble_pk=ensemble.pk, name=name)
-        .one()
-    )
-
-    await blob_handler.stage_blob(
-        file_block_obj=file_block_obj,
         request=request,
-        record_obj=record_obj,
-        block_id=block_id,
+        block_index=block_index,
     )
 
     db.add(file_block_obj)
