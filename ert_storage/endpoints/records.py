@@ -132,13 +132,10 @@ async def create_blob(
         filename="test",
         mimetype="mime/type",
     )
-    if HAS_AZURE_BLOB_STORAGE:
-        key = f"{name}@{realization_index}@{uuid4()}"
-        blob = azure_blob_container.get_blob_client(key)
-        file_obj.az_container = (azure_blob_container.container_name,)
-        file_obj.az_blob = (key,)
-    else:
-        pass
+
+    blob_handler.create_blob(
+        name=name, realization_index=realization_index, file_obj=file_obj
+    )
 
     db.add(file_obj)
 

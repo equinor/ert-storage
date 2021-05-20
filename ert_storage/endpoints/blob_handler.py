@@ -28,6 +28,11 @@ class GeneralBlobHandler:
     ) -> None:
         file_block_obj.content = await request.body()
 
+    def create_blob(
+        self, name: str, realization_index: Optional[int], file_obj: ds.File
+    ) -> None:
+        pass
+
 
 class AzureBlobHandler(GeneralBlobHandler):
     async def upload_blob(
@@ -54,6 +59,14 @@ class AzureBlobHandler(GeneralBlobHandler):
         key = record_obj.file.az_blob
         blob = azure_blob_container.get_blob_client(key)
         await blob.stage_block(block_id, await request.body())
+
+    def create_blob(
+        self, name: str, realization_index: Optional[int], file_obj: ds.File
+    ) -> None:
+        key = f"{name}@{realization_index}@{uuid4()}"
+        blob = azure_blob_container.get_blob_client(key)
+        file_obj.az_container = (azure_blob_container.container_name,)
+        file_obj.az_blob = (key,)
 
 
 def get_handler() -> GeneralBlobHandler:
