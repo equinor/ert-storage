@@ -52,16 +52,13 @@ def test_get_prior_for_parameters(client, create_ensemble, make_random_priors):
         "/experiments", json={"name": rand_name(), "priors": epriors}
     ).json()
     ensid = create_ensemble(exp["id"], parameters=eparams)
-    print(exp)
 
     # Post parameters with priors
     param_to_prior = {}
-    for param, prior, prior_val in zip(
-        eparams, exp["priors"].values(), epriors.values()
-    ):
+    for param, prior, prior_val in zip(eparams, exp["priors"].keys(), epriors.values()):
         client.post(
             f"/ensembles/{ensid}/records/{param}/matrix",
-            params={"prior_id": prior},
+            params={"prior": prior},
             json=np.random.rand(2, 3).tolist(),
         )
         param_to_prior[param] = prior_val
