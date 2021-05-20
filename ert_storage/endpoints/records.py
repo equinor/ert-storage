@@ -21,14 +21,15 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.attributes import flag_modified
 from ert_storage.database import Session, get_db, HAS_AZURE_BLOB_STORAGE
 from ert_storage import database_schema as ds, json_schema as js
+from ert_storage.endpoints import blob_handler as bh
 
 from fastapi.logger import logger
 
 if HAS_AZURE_BLOB_STORAGE:
     from ert_storage.database import azure_blob_container
 
-
 router = APIRouter(tags=["record"])
+blob_handler = bh.get_handler()
 
 
 class ListRecords(BaseModel):
@@ -54,15 +55,10 @@ async def post_ensemble_record_file(
         filename=file.filename,
         mimetype=file.content_type,
     )
-    if HAS_AZURE_BLOB_STORAGE:
-        key = f"{name}@{realization_index}@{uuid4()}"
-        blob = azure_blob_container.get_blob_client(key)
-        await blob.upload_blob(file.file)
 
-        file_obj.az_container = azure_blob_container.container_name
-        file_obj.az_blob = key
-    else:
-        file_obj.content = await file.read()
+    await blob_handler.upload_blob(
+        file_obj=file_obj, file=file, name=name, realization_index=realization_index
+    )
 
     db.add(file_obj)
     _create_record(
