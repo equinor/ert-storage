@@ -2,9 +2,7 @@ from uuid import uuid4, UUID
 import io
 import numpy as np
 import pandas as pd
-from enum import Enum
 from typing import Any, Mapping, Optional, List, AsyncGenerator
-import sqlalchemy as sa
 from fastapi import (
     APIRouter,
     Body,
@@ -21,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.attributes import flag_modified
-from ert_storage.database import Session, get_db, HAS_AZURE_BLOB_STORAGE, BLOB_CONTAINER
+from ert_storage.database import Session, get_db, HAS_AZURE_BLOB_STORAGE
 from ert_storage import database_schema as ds, json_schema as js
 
 from fastapi.logger import logger
