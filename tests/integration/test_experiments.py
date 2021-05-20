@@ -17,7 +17,7 @@ def test_list(client, create_experiment):
     ]
 
     assert expected_experiments == {exp["name"] for exp in docs}
-    assert all(exp["ensembles"] == [] for exp in docs)
+    assert all(exp["ensemble_ids"] == [] for exp in docs)
 
 
 def test_ensembles(client, create_experiment, create_ensemble):
@@ -33,7 +33,7 @@ def test_ensembles(client, create_experiment, create_ensemble):
         raise KeyError(
             f"Experiment with id '{experiment_id}' not found in the list of experiments"
         )
-    assert ids == set(doc["ensembles"])
+    assert ids == set(doc["ensemble_ids"])
 
     # The list of ensembles belonging to the newly created experiment matches
     resp = client.get(f"/experiments/{experiment_id}/ensembles")
