@@ -2,10 +2,11 @@ import pytest
 
 
 @pytest.fixture
-def client(ert_storage_client):
+def client(ert_storage_client, monkeypatch):
     """
-    Simple rename of ert_storage_client -> client
+    Simple rename of ert_storage_client -> client, with security off
     """
+    monkeypatch.setenv("ERT_STORAGE_NO_TOKEN", "1")
     return ert_storage_client
 
 

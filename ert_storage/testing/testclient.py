@@ -13,6 +13,7 @@ from typing import (
 )
 from pprint import pformat
 from contextlib import contextmanager
+from fastapi import Depends
 from sqlalchemy.orm.session import Session
 from sqlalchemy.engine.base import Transaction
 from starlette.testclient import (
@@ -28,6 +29,8 @@ from starlette.testclient import (
 from sqlalchemy.orm import sessionmaker
 from graphene import Schema as GrapheneSchema
 from graphene.test import Client as GrapheneClient
+
+from ert_storage.security import security
 
 
 if TYPE_CHECKING:
@@ -268,7 +271,9 @@ def _override_get_db(session: sessionmaker) -> None:
         IS_POSTGRES,
     )
 
-    async def override_get_db() -> AsyncGenerator[Session, None]:
+    async def override_get_db(
+        *, _: None = Depends(security)
+    ) -> AsyncGenerator[Session, None]:
         db = session()
 
         # Make PostgreSQL return float8 columns with highest precision. If we don't
