@@ -29,7 +29,6 @@ if HAS_AZURE_BLOB_STORAGE:
     from ert_storage.database import azure_blob_container
 
 router = APIRouter(tags=["record"])
-blob_handler = bh.get_handler()
 
 
 class ListRecords(BaseModel):
@@ -51,9 +50,11 @@ async def post_ensemble_record_file(
     """
     ensemble = _get_and_assert_ensemble(db, ensemble_id, name, realization_index)
 
-    file_obj = await blob_handler.upload_blob(
-        file=file, name=name, realization_index=realization_index
+    blob_handler = bh.get_handler(
+        db=db, name=name, ensemble_id=ensemble_id, realization_index=realization_index
     )
+
+    file_obj = await blob_handler.upload_blob(file=file)
 
     db.add(file_obj)
     _create_record(
@@ -79,11 +80,11 @@ async def add_block(
     """
     Stage blocks to an existing azure blob record.
     """
+    blob_handler = bh.get_handler(
+        db=db, name=name, ensemble_id=ensemble_id, realization_index=realization_index
+    )
+
     file_block_obj = await blob_handler.stage_blob(
-        db=db,
-        ensemble_id=ensemble_id,
-        name=name,
-        realization_index=realization_index,
         request=request,
         block_index=block_index,
     )
@@ -103,11 +104,15 @@ async def create_blob(
     """
     Create a record which points to a blob on Azure Blob Storage.
     """
-    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
-    file_obj = blob_handler.create_blob(name=name, realization_index=realization_index)
+    blob_handler = bh.get_handler(
+        db=db, name=name, ensemble_id=ensemble_id, realization_index=realization_index
+    )
+
+    file_obj = blob_handler.create_blob()
 
     db.add(file_obj)
 
+    ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
     _create_record(
         db,
         ensemble,
@@ -129,10 +134,11 @@ async def finalize_blob(
     """
     Commit all staged blocks to a blob record
     """
-
-    await blob_handler.finalize_blob(
-        db=db, ensemble_id=ensemble_id, name=name, realization_index=realization_index
+    blob_handler = bh.get_handler(
+        db=db, name=name, ensemble_id=ensemble_id, realization_index=realization_index
     )
+
+    await blob_handler.finalize_blob()
 
 
 @router.post(
