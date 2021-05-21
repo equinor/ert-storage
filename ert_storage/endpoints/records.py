@@ -1,8 +1,8 @@
-from uuid import uuid4, UUID
+from uuid import UUID
 import io
 import numpy as np
 import pandas as pd
-from typing import Any, Mapping, Optional, List, AsyncGenerator
+from typing import Any, Mapping, Optional, List
 from fastapi import (
     APIRouter,
     Body,
@@ -14,19 +14,16 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.attributes import flag_modified
-from ert_storage.database import Session, get_db, HAS_AZURE_BLOB_STORAGE
+from ert_storage.database import Session, get_db
 from ert_storage import database_schema as ds, json_schema as js
 from ert_storage.endpoints import blob_handler as bh
 
 from fastapi.logger import logger
-
-if HAS_AZURE_BLOB_STORAGE:
-    from ert_storage.database import azure_blob_container
 
 router = APIRouter(tags=["record"])
 
@@ -481,12 +478,6 @@ async def get_ensemble_record(
     - File:
       Will return the file that was uploaded.
     """
-    if accept == "application/x-dataframe":
-        logger.warning(
-            "Accept with 'application/x-dataframe' is deprecated. Use 'text/csv' instead."
-        )
-        accept = "text/csv"
-
     if realization_index is None:
         bundle = _get_ensemble_record(db, ensemble_id, name)
     else:
@@ -501,7 +492,14 @@ async def get_ensemble_record(
             is_parameter = name in bundle.record_info.ensemble.parameter_names
             if not is_matrix or not is_parameter:
                 raise exc
-    return await _get_record_data(bundle, accept, realization_index)
+    return await _get_record_data(
+        db=db,
+        ensemble_id=ensemble_id,
+        name=name,
+        record=bundle,
+        accept=accept,
+        realization_index=realization_index,
+    )
 
 
 @router.get("/ensembles/{ensemble_id}/parameters", response_model=List[str])
@@ -542,14 +540,8 @@ async def get_record_data(
     record_id: UUID,
     accept: Optional[str] = Header(default="application/json"),
 ) -> Any:
-    if accept == "application/x-dataframe":
-        logger.warning(
-            "Accept with 'application/x-dataframe' is deprecated. Use 'text/csv' instead."
-        )
-        accept = "text/csv"
-
     record = db.query(ds.Record).filter_by(id=record_id).one()
-    return await _get_record_data(record, accept)
+    return await _get_record_data(db=db, record=record, accept=accept)
 
 
 @router.get(
@@ -667,69 +659,18 @@ def _get_and_assert_ensemble(
 
 
 async def _get_record_data(
-    record: ds.Record, accept: Optional[str], realization_index: Optional[int] = None
+    db: Session,
+    record: ds.Record,
+    accept: Optional[str],
+    ensemble_id: Optional[UUID] = None,
+    name: Optional[str] = None,
+    realization_index: Optional[int] = None,
 ) -> Response:
-    type_ = record.record_info.record_type
-    if type_ == ds.RecordType.f64_matrix:
-        if realization_index is None:
-            content = record.f64_matrix.content
-        else:
-            content = record.f64_matrix.content[realization_index]
-
-        if accept == "application/x-numpy":
-            from numpy.lib.format import write_array
-
-            stream = io.BytesIO()
-            write_array(stream, np.array(content))
-
-            return Response(
-                content=stream.getvalue(),
-                media_type="application/x-numpy",
-            )
-        if accept == "text/csv":
-            data = pd.DataFrame(content)
-            labels = record.f64_matrix.labels
-            if labels is not None and realization_index is None:
-                data.columns = labels[0]
-                data.index = labels[1]
-            elif labels is not None and realization_index is not None:
-                # The output is such that rows are realizations. Because
-                # `content` is a 1d list in this case, it treats each element as
-                # its own row. We transpose the data so that all of the data
-                # falls on the same row.
-                data = data.T
-                data.columns = labels[0]
-                data.index = [realization_index]
-
-            return Response(
-                content=data.to_csv().encode(),
-                media_type="text/csv",
-            )
-        else:
-            return content
-    if type_ == ds.RecordType.file:
-        f = record.file
-        if f.content is not None:
-            return Response(
-                content=f.content,
-                media_type=f.mimetype,
-                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
-            )
-        elif f.az_container is not None and f.az_blob is not None:
-            blob = azure_blob_container.get_blob_client(f.az_blob)
-            download = await blob.download_blob()
-
-            async def chunk_generator() -> AsyncGenerator[bytes, None]:
-                async for chunk in download.chunks():
-                    yield chunk
-
-            return StreamingResponse(
-                chunk_generator(),
-                media_type=f.mimetype,
-                headers={"Content-Disposition": f'attachment; filename="{f.filename}"'},
-            )
-    raise NotImplementedError(
-        f"Getting record data for type {type_} and Accept header {accept} not implemented"
+    blob_handler = bh.get_handler(
+        db=db, name=name, ensemble_id=ensemble_id, realization_index=realization_index
+    )
+    return await blob_handler.extract_content(
+        record=record, accept=accept, realization_index=realization_index
     )
 
 
