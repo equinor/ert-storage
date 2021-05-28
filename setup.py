@@ -22,10 +22,12 @@ setup(
         "ert_storage.json_schema",
         "ert_storage.testing",
     ],
+    package_dir={
+        "": "src",
+    },
     package_data={
-        "ert_storage._alembic": [
-            "alembic.ini",
-        ]
+        "ert_storage": ["py.typed"],
+        "ert_storage._alembic": ["alembic.ini"],
     },
     entry_points={
         "console_scripts": ["ert-storage=ert_storage.__main__:main"],
