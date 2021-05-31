@@ -58,7 +58,7 @@ setup(
         "python-multipart",
         "requests",
         "sqlalchemy>=1.4",
-        "starlette==0.13.6",
+        "starlette==0.14.2",
         "uvicorn",
     ],
 )
