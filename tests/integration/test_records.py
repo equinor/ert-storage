@@ -344,7 +344,7 @@ def test_forward_model_file(client, simple_ensemble):
             assert resp.status_code == 404
 
 
-def test_blocked_blob(client, simple_ensemble):
+def test_chunked_blob(client, simple_ensemble):
 
     ensemble_id = simple_ensemble()
 
@@ -377,6 +377,34 @@ def test_blocked_blob(client, simple_ensemble):
         f"/ensembles/{ensemble_id}/records/foo",
     )
     assert b"".join(chunks) == resp.content
+
+
+def test_chunked_blob_out_of_order(client, simple_ensemble):
+    ensemble_id = simple_ensemble()
+    chunks = [
+        (1, b"b"),
+        (0, b"a"),
+        (2, b"c"),
+    ]
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/foo/blob",
+    )
+    for i, chunk in chunks:
+        client.put(
+            f"/ensembles/{ensemble_id}/records/foo/blob",
+            params={"block_index": i},
+            data=chunk,
+        )
+
+    client.patch(
+        f"/ensembles/{ensemble_id}/records/foo/blob",
+    )
+
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/foo",
+    )
+    assert resp.content == b"abc"
 
 
 def test_responses(client, simple_ensemble):
