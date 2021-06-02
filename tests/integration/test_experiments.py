@@ -1,11 +1,11 @@
 import numpy as np
 import random
-
+from uuid import uuid4
 from fastapi import status
+from ert_storage import json_schema as js
 
 
-def test_list(client, create_experiment):
-
+def test_get_multiple_experiments(client, create_experiment):
     expected_experiments = {"test1", "test2", "test3"}
     for name in expected_experiments:
         create_experiment(name)
@@ -18,6 +18,43 @@ def test_list(client, create_experiment):
 
     assert expected_experiments == {exp["name"] for exp in docs}
     assert all(exp["ensemble_ids"] == [] for exp in docs)
+
+    # get experiments one by one
+    experiment_ids = {exp["id"]: exp["name"] for exp in docs}
+    for exp_id in experiment_ids:
+        assert (
+            client.get(f"/experiments/{exp_id}").json()["name"]
+            == experiment_ids[exp_id]
+        )
+
+
+def test_post_prior_experiment(client, make_prior):
+    prior = make_prior()
+
+    experiment_id = client.post(
+        "/experiments", json={"name": "test", "priors": {"testpri": prior.dict()}}
+    ).json()["id"]
+
+    priors = client.get(f"/experiments/{experiment_id}").json()["priors"]
+    assert len(priors) == 1
+    assert priors["testpri"] == prior
+
+
+def test_post_multiple_priors_experiment(client, make_random_priors):
+    priors = {random_name(): prior for prior in make_random_priors(10)}
+
+    experiment_id = client.post(
+        "/experiments", data=js.ExperimentIn(name="footest", priors=priors).json()
+    ).json()["id"]
+
+    actual_priors = client.get(f"/experiments/{experiment_id}").json()["priors"]
+    assert len(priors) == 10
+    for name, prior in actual_priors.items():
+        assert priors[name] == prior
+
+
+def random_name() -> str:
+    return f"xxx{uuid4()}"
 
 
 def test_ensembles(client, create_experiment, create_ensemble):
