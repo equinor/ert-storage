@@ -38,6 +38,7 @@ setup(
             "black",
             "pytest",
             "mypy",
+            "types-requests",
         ],
         "postgres": [
             "psycopg2",
