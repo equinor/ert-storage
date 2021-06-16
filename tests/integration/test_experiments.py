@@ -41,10 +41,10 @@ def test_post_prior_experiment(client, make_prior):
 
 
 def test_post_multiple_priors_experiment(client, make_random_priors):
-    priors = {random_name(): prior for prior in make_random_priors(10)}
+    priors = {random_name(): prior.dict() for prior in make_random_priors(10)}
 
     experiment_id = client.post(
-        "/experiments", data=js.ExperimentIn(name="footest", priors=priors).json()
+        "/experiments", json={"name": "footest", "priors": priors}
     ).json()["id"]
 
     actual_priors = client.get(f"/experiments/{experiment_id}").json()["priors"]
