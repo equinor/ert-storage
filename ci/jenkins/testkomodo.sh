@@ -4,7 +4,7 @@ copy_test_files () {
 }
 
 install_test_dependencies () {
-    pip install .[test]
+    pip install black pytest
 }
 
 install_package () {
