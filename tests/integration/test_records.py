@@ -425,3 +425,25 @@ def test_responses(client, simple_ensemble):
     assert len(responses) == 1
     data = client.get(f"/records/{responses['rec3']['id']}/data").json()
     assert data == [[1, 2], [4, 5]]
+
+
+def test_fetch_matrix_ensemble_record_by_realization(client, simple_ensemble):
+    ensemble_id = simple_ensemble(parameters=[], responses=["polynomial_output"])
+    client.post(
+        url=f"/ensembles/{ensemble_id}/records/polynomial_output/matrix",
+        headers={"content-type": "text/csv"},
+        data=b",0,1\n0,1.0,3.0\n1,1.0,1.0\n2,2.0,4.0\n3,3.0,1.0\n4,5.0,5.0\n",
+    )
+    resp = client.get(
+        url=f"/ensembles/{ensemble_id}/records/polynomial_output",
+        params={"realization_index": 0},
+    )
+    real_0 = resp.json()
+    assert real_0 == [1.0, 3.0]
+
+    resp = client.get(
+        url=f"/ensembles/{ensemble_id}/records/polynomial_output",
+        params={"realization_index": 4},
+    )
+    real_4 = resp.json()
+    assert real_4 == [5.0, 5.0]
