@@ -57,6 +57,7 @@ setup(
         "graphene-sqlalchemy>=2.0",
         "numpy",
         "pandas",
+        "pyarrow",
         "pydantic",
         "python-multipart",
         "requests",

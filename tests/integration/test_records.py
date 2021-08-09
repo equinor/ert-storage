@@ -296,6 +296,67 @@ def test_ensemble_matrix_dataframe(client, simple_ensemble, mimetype):
     assert_array_equal(df.index.values, data.index.values)
 
 
+@pytest.mark.parametrize(
+    "labels",
+    [
+        [
+            ["north", "south", "east", "west", "up"],
+            ["1.0", "2.0", "3.0", "4.0", "5.0", "6.0", "7.0", "8.0"],
+        ],
+        [
+            ["A", "B", "C", "D", "E"],
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+        ],
+        [
+            ["A", "B", "C", "D", "E"],
+            [1, 2, 3, 4, 5, 6, 7, 8],
+        ],
+        [
+            ["A", "B", "C", "D", "E"],
+            [
+                np.datetime64("2020-01-01"),
+                np.datetime64("2020-01-02"),
+                np.datetime64("2020-01-03"),
+                np.datetime64("2020-01-04"),
+                np.datetime64("2020-01-05"),
+                np.datetime64("2020-01-06"),
+                np.datetime64("2020-01-07"),
+                np.datetime64("2020-01-08"),
+            ],
+        ],
+    ],
+)
+def test_ensemble_dataframe_labels(client, simple_ensemble, labels):
+    mimetype = "application/x-parquet"
+    ensemble_id = simple_ensemble()
+    matrix = np.random.rand(8, 5)
+    # POST
+    post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
+
+    data = pd.DataFrame(matrix)
+    data.columns = labels[0]
+    data.index = labels[1]
+    stream = io.BytesIO()
+    data.to_parquet(stream)
+    resp = client.post(
+        post_url,
+        data=stream.getvalue(),
+        headers={"content-type": mimetype},
+    )
+
+    # GET
+    get_url = f"/ensembles/{ensemble_id}/records/mat"
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/mat",
+        headers={"accept": mimetype},
+    )
+    stream = io.BytesIO(resp.content)
+    df = pd.read_parquet(stream)
+    assert_array_equal(df.values, data.values)
+    assert type(data.index) == type(df.index)
+    assert type(data.columns) == type(df.columns)
+
+
 def test_ensemble_file(client, simple_ensemble):
     ensemble_id = simple_ensemble()
 

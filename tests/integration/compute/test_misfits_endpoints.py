@@ -43,7 +43,7 @@ def test_misfits_with_labels(client, create_experiment, create_ensemble):
         resp = client.post(
             f"/ensembles/{ensemble_id}/records/{name}/matrix",
             data=data_df[id_real].to_csv().encode(),
-            headers={"content-type": "application/x-dataframe"},
+            headers={"content-type": "text/csv"},
             params=dict(realization_index=id_real),
         )
         client.post(
