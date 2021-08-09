@@ -64,7 +64,7 @@ def test_get_gql_response(client, create_experiment, create_ensemble):
             client.post(
                 f"/ensembles/{ensemble_id}/records/{resp_name}/matrix",
                 data=data_df[id_real].to_csv().encode(),
-                headers={"content-type": "application/x-dataframe"},
+                headers={"content-type": "text/csv"},
                 params={"realization_index": id_real},
             )
             for resp_name in RESPONSE_NAMES
