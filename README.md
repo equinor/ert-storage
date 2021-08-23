@@ -156,6 +156,54 @@ dropdb ert_db && createdb -O ert_user ert_db
 ert-storage alembic upgrade head
 ```
 
+### Database setup: Local user setup on RHEL 7
+
+First, download the required version of postgresql. For instance, for RHEL-7 you can check [here](https://yum.postgresql.org/13/redhat/rhel-7-x86_64/repoview/postgresql13-server.html). 
+Extract and copy postgresql to a custom directory; eg.:
+
+```sh
+rpm2cpio postgresql-<version>-x86_64.rpm | cpio -idv
+```
+
+Append the postgres bin path to your actual PATH; eg. 
+
+```sh
+export PATH=$PATH:/data/install/postgres/usr/pgsql-<version>/bin
+```
+
+In the directory where you want to host the database run
+
+```sh
+cd <path-to-your-project>
+initdb -D ~/dbdir
+```
+
+where dbdir represents the directory name where the database is hosted.
+
+Open the config file `~/dbdir/postgresql.conf` and find the entry `unix_socket_directories` and set it to
+unix_socket_directories = '/tmp/'
+
+Start the server via 
+
+```sh
+postgres -D ~/dbdir -k /tmp
+```
+
+in other terminal, whenever you want to make use of the database, set
+
+```sh
+export PGHOST=/tmp
+```
+
+Now everything should be good to go. The logs can be found in `~/dbdir/log/` directory.
+To create a user and a database, you can use the following commands:
+
+```sh
+createuser -h localhost -p 5432 -s ert_user
+createdb -h localhost -U ert_user ert_db
+```
+
+
 ### After setup
 Once a PostgreSQL server is running, you need to apply alembic migrations.
 `ert-storage` provides a wrapper around the `alembic` command which
