@@ -12,8 +12,13 @@ install_package () {
 }
 
 start_tests () {
-    pytest -k "not test_typing and not spe1"
     run_spe1_tests
+    test_result=$?
+    if [ "$test_result" -gt 0 ];
+    then
+        exit $test_result
+    fi
+    pytest -vs -k "not test_typing and not spe1"
 }
 
 run_spe1_tests() {
@@ -50,8 +55,5 @@ run_spe1_tests() {
   kill $ert_api_pid
   wait $ert_api_pid
   echo "Completed"
-  if [ "$status" -g 0 ]; then
-      exit $status
-  fi
-
+  return "$status"
 }
