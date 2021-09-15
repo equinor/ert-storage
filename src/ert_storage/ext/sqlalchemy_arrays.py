@@ -10,7 +10,7 @@ does it internally for its other types.
 from typing import Optional, Type, Union
 import sqlalchemy as sa
 
-from ert_storage.database import IS_POSTGRES
+from ert_storage.database import database_config
 
 import graphene
 from graphene_sqlalchemy.converter import convert_sqlalchemy_type
@@ -24,7 +24,7 @@ SQLAlchemyColumn = Union[sa.types.TypeEngine, Type[sa.types.TypeEngine]]
 FloatArray: SQLAlchemyColumn
 StringArray: SQLAlchemyColumn
 
-if IS_POSTGRES:
+if database_config.IS_POSTGRES:
     FloatArray = sa.ARRAY(sa.FLOAT)
     StringArray = sa.ARRAY(sa.String)
 else:
