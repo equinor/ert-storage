@@ -15,7 +15,7 @@ def test_help_missing_env_rdbms(monkeypatch):
     with pytest.raises(Exception) as e:
         from ert_storage import database
 
-        database.database_config.get_env_rdbms()
+        database.get_env_rdbms()
 
     assert str(e.value) == "Environment variable 'ERT_STORAGE_DATABASE_URL' not set"
 
@@ -26,6 +26,6 @@ def test_help_with_env_rdbms(monkeypatch):
 
     from ert_storage import database
 
-    act_rdbms = database.database_config.get_env_rdbms()
+    act_rdbms = database.get_env_rdbms()
 
     assert db_url == act_rdbms
