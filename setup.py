@@ -45,7 +45,7 @@ setup(
         ],
         "azure": [
             "aiohttp",
-            "azure-storage-blob",
+            "azure-storage-blob<12.9",
         ],
     },
     install_requires=[
