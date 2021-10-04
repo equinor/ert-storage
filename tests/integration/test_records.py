@@ -99,7 +99,7 @@ def test_ensemble_wide_parameters(client, simple_ensemble):
         assert resp.json() == param
 
 
-@pytest.mark.parametrize("mimetype", ["application/x-dataframe", "text/csv"])
+@pytest.mark.parametrize("mimetype", ["application/x-parquet", "text/csv"])
 def test_ensemble_wide_parameters_dataframe(client, simple_ensemble, mimetype):
     ensemble_id = simple_ensemble(["coeffs"])
     matrix = np.random.rand(8, 5)
@@ -112,9 +112,16 @@ def test_ensemble_wide_parameters_dataframe(client, simple_ensemble, mimetype):
     data.columns = labels[0]
     data.index = labels[1]
 
+    if mimetype == "application/x-parquet":
+        stream = io.BytesIO()
+        data.to_parquet(stream)
+        data_formatted = stream.getvalue()
+    else:
+        data_formatted = data.to_csv()
+
     client.post(
         f"/ensembles/{ensemble_id}/records/coeffs/matrix",
-        data=data.to_csv(),
+        data=data_formatted,
         headers={"content-type": mimetype},
     )
 
@@ -123,7 +130,12 @@ def test_ensemble_wide_parameters_dataframe(client, simple_ensemble, mimetype):
         f"/ensembles/{ensemble_id}/records/coeffs",
         headers={"accept": mimetype},
     )
-    assert resp.content == data.to_csv().encode()
+    if mimetype == "application/x-parquet":
+        stream = io.BytesIO()
+        data.to_parquet(stream)
+        assert resp.content == stream.getvalue()
+    else:
+        assert resp.content == data.to_csv().encode()
 
     # Fetch with realization_index
     for index, param in enumerate(data.iterrows()):
@@ -135,9 +147,14 @@ def test_ensemble_wide_parameters_dataframe(client, simple_ensemble, mimetype):
 
         # param[1] is a pd.Series type, which is converted to DataFrame and transposed
         expect_param = param[1].to_frame().T
-        actual_param = pd.read_csv(
-            io.BytesIO(resp.content), index_col=0, float_precision="round_trip"
-        )
+
+        if mimetype == "application/x-parquet":
+            actual_param = pd.read_parquet(io.BytesIO(resp.content))
+        else:
+            actual_param = pd.read_csv(
+                io.BytesIO(resp.content), index_col=0, float_precision="round_trip"
+            )
+
         assert [index] == actual_param.index
 
         # The index of the returned parameter vector is the realization index, not labels[1].
@@ -262,7 +279,7 @@ def test_ensemble_matrix_json(client, simple_ensemble, get, post):
         raise NotImplementedError()
 
 
-@pytest.mark.parametrize("mimetype", ["application/x-dataframe", "text/csv"])
+@pytest.mark.parametrize("mimetype", ["application/x-parquet", "text/csv"])
 def test_ensemble_matrix_dataframe(client, simple_ensemble, mimetype):
     ensemble_id = simple_ensemble()
     matrix = np.random.rand(8, 5)
@@ -276,9 +293,17 @@ def test_ensemble_matrix_dataframe(client, simple_ensemble, mimetype):
     data = pd.DataFrame(matrix)
     data.columns = labels[0]
     data.index = labels[1]
+
+    if mimetype == "application/x-parquet":
+        stream = io.BytesIO()
+        data.to_parquet(stream)
+        data_formatted = stream.getvalue()
+    else:
+        data_formatted = data.to_csv()
+
     resp = client.post(
         post_url,
-        data=data.to_csv().encode(),
+        data=data_formatted,
         headers={"content-type": mimetype},
     )
 
@@ -289,7 +314,11 @@ def test_ensemble_matrix_dataframe(client, simple_ensemble, mimetype):
         headers={"accept": mimetype},
     )
     stream = io.BytesIO(resp.content)
-    df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+
+    if mimetype == "application/x-parquet":
+        df = pd.read_parquet(stream)
+    else:
+        df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
 
     assert_array_equal(df.values, data.values)
     assert_array_equal(df.columns.values, data.columns.values)
