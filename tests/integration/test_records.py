@@ -50,6 +50,22 @@ def test_ensemble_size_out_of_bounds(client, simple_ensemble):
         check_status_code=status.HTTP_417_EXPECTATION_FAILED,
     )
 
+    ensemble_id = simple_ensemble(size=4, active_realizations=[0, 2])
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/foo/file",
+        params=dict(realization_index=1),
+        files={"file": ("foo.bar", io.BytesIO(), "foo/bar")},
+        check_status_code=status.HTTP_417_EXPECTATION_FAILED,
+    )
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/foo/file",
+        params=dict(realization_index=2),
+        files={"file": ("foo.bar", io.BytesIO(), "foo/bar")},
+        check_status_code=status.HTTP_200_OK,
+    )
+
 
 def test_parameters(client, simple_ensemble):
     ensemble_id = simple_ensemble(["coeffs"], size=5)

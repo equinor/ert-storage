@@ -1,8 +1,8 @@
 import numpy as np
+import pytest
 import random
 from uuid import uuid4
 from fastapi import status
-from ert_storage import json_schema as js
 
 
 def test_get_multiple_experiments(client, create_experiment):
@@ -85,6 +85,64 @@ def test_ensemble_size(client, create_experiment, create_ensemble):
 
     resp = client.get(f"/ensembles/{ensemble_id}")
     assert ensemble_size == resp.json()["size"]
+
+
+@pytest.mark.parametrize(
+    "ensemble_size, active_reals, expected_reals",
+    [(3, None, [0, 1, 2]), (3, [], [0, 1, 2]), (42, [1, 5, 7], [1, 5, 7])],
+)
+def test_ensemble_active_realizations(
+    client,
+    create_experiment,
+    create_ensemble,
+    ensemble_size,
+    active_reals,
+    expected_reals,
+):
+    experiment_id = create_experiment("test_ensembles")
+
+    ensemble_id = create_ensemble(
+        experiment_id=experiment_id,
+        size=ensemble_size,
+        active_realizations=active_reals,
+    )
+
+    resp = client.get(f"/ensembles/{ensemble_id}")
+    assert ensemble_size == resp.json()["size"]
+    assert expected_reals == resp.json()["active_realizations"]
+
+
+@pytest.mark.parametrize(
+    "ensemble_size, active_reals, error",
+    [
+        (
+            4,
+            [0, 5],
+            "Ensemble active realization index 5 out of realization range [0,3]",
+        ),
+        (
+            2,
+            [0, 1, 1],
+            "Non unique active realization index list not allowed [0, 1, 1]",
+        ),
+    ],
+)
+def test_ensemble_active_realizations_exceptions(
+    client, create_experiment, ensemble_size, active_reals, error
+):
+    experiment_id = create_experiment("test_ensembles")
+
+    resp = client.post(
+        f"/experiments/{experiment_id}/ensembles",
+        json={
+            "parameter_names": [],
+            "response_names": [],
+            "size": ensemble_size,
+            "active_realizations": active_reals,
+        },
+        check_status_code=status.HTTP_417_EXPECTATION_FAILED,
+    )
+    assert resp.json()["detail"]["error"] == error
 
 
 def test_delete_experiment(client, create_experiment, create_ensemble):

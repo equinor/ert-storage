@@ -8,13 +8,14 @@ query($id: ID!) {
     id
     size
     parameterNames
+    activeRealizations
   }
 }
 """
 
 CREATE_ENSEMBLE = """\
-mutation create($experimentId: ID!, $size: Int!, $params: [String]) {
-  createEnsemble(experimentId: $experimentId, size: $size, parameterNames: $params) {
+mutation create($experimentId: ID!, $size: Int!, $activeRealizations: [Int], $params: [String]) {
+  createEnsemble(experimentId: $experimentId, size: $size, activeRealizations: $activeRealizations, parameterNames: $params) {
     id
   }
 }
@@ -28,13 +29,14 @@ def test_get_ensemble(client, simple_ensemble):
 
     assert r["data"]["ensemble"]["id"] == str(eid)
     assert r["data"]["ensemble"]["parameterNames"] == eparams
+    assert r["data"]["ensemble"]["activeRealizations"] == []
 
 
 def test_create_ensemble(client, create_experiment):
     experiment_id = create_experiment(rand_name())
     eparams = [rand_name() for _ in range(8)]
 
-    ensemble_size = ensemble_size = random.randint(0, 1000)
+    ensemble_size = random.randint(0, 1000)
     r = client.gql_execute(
         CREATE_ENSEMBLE,
         variable_values={
@@ -50,6 +52,7 @@ def test_create_ensemble(client, create_experiment):
     assert r["data"]["ensemble"]["id"] == eid
     assert r["data"]["ensemble"]["parameterNames"] == eparams
     assert r["data"]["ensemble"]["size"] == ensemble_size
+    assert r["data"]["ensemble"]["activeRealizations"] == list(range(ensemble_size))
 
 
 def rand_name():
