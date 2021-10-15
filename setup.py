@@ -45,7 +45,7 @@ setup(
         ],
         "azure": [
             "aiohttp",
-            "azure-storage-blob<12.9",
+            "azure-storage-blob",
         ],
     },
     install_requires=[
@@ -62,7 +62,6 @@ setup(
         "python-multipart",
         "requests",
         "sqlalchemy>=1.4",
-        "starlette==0.14.2",
         "uvicorn",
     ],
 )
