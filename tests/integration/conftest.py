@@ -1,4 +1,40 @@
 import pytest
+import subprocess
+import time
+
+
+@pytest.fixture()
+def base_url():
+    return "http://localhost:8000"
+
+
+@pytest.fixture(scope="session")
+def auth():
+    return "secretSquirrel"
+
+
+@pytest.fixture(scope="session")
+def server(auth):
+    server_proc = subprocess.Popen(
+        [
+            "env",
+            f"ERT_STORAGE_TOKEN={auth}",
+            "python",
+            "-m",
+            "ert_storage",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+
+    # Using a sleep to wait for server start is too fragile, but not much
+    # other choice that is lightweight
+    time.sleep(2)
+    # Check it started successfully
+    assert not server_proc.poll(), server_proc.stdout.read().decode("utf-8")
+    yield server_proc
+    # Shut it down at the end of the pytest session
+    server_proc.terminate()
 
 
 @pytest.fixture
