@@ -53,7 +53,7 @@ setup(
         "async-exit-stack; python_version < '3.7'",
         "async-generator; python_version < '3.7'",
         "fastapi",
-        "graphene",
+        "graphene<3.0.0",
         "graphene-sqlalchemy>=2.0",
         "numpy",
         "pandas",
