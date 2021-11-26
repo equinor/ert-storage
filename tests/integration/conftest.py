@@ -29,7 +29,7 @@ def server(auth):
 
     # Using a sleep to wait for server start is too fragile, but not much
     # other choice that is lightweight
-    time.sleep(2)
+    time.sleep(30)
     # Check it started successfully
     assert not server_proc.poll(), server_proc.stdout.read().decode("utf-8")
     yield server_proc
