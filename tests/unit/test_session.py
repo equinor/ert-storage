@@ -9,7 +9,8 @@ VALID_CONFIG = """
 }"""
 
 
-def test_missing_configuration():
+def test_missing_configuration(monkeypatch):
+    monkeypatch.setenv("ERT_STORAGE_CONNECTION_STRING", "")
     with pytest.raises(RuntimeError):
         with Session():
             pass
@@ -32,13 +33,15 @@ def test_invalid_configuration_file(tmp_path):
 
 
 def test_no_server_configuration_env(monkeypatch):
+    monkeypatch.setenv("NO_PROXY", "*")
     monkeypatch.setenv("ERT_STORAGE_CONNECTION_STRING", VALID_CONFIG)
     with pytest.raises(RuntimeError):
         with Session():
             pass
 
 
-def test_no_server_configuration_file(tmp_path):
+def test_no_server_configuration_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("NO_PROXY", "*")
     config_file = tmp_path / "storage_server.json"
     config_file.write_text(VALID_CONFIG)
     os.chdir(tmp_path)
