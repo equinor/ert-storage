@@ -69,30 +69,37 @@ def test_ensemble_size_out_of_bounds(client, simple_ensemble):
 
 def test_parameters(client, simple_ensemble):
     ensemble_id = simple_ensemble(["coeffs"], size=5)
-    client.post(
-        f"/ensembles/{ensemble_id}/records/coeffs/matrix",
-        data=f"{PARAMETERS}",
-    )
+    # client.post(
+    #     f"/ensembles/{ensemble_id}/records/coeffs/matrix",
+    #     data=f"{PARAMETERS}",
+    # )
+    #
+    # resp = client.get(f"/ensembles/{ensemble_id}/parameters")
+    # assert resp.json() == ["coeffs"]
+    #
+    # resp = client.get(f"/ensembles/{ensemble_id}/records/coeffs")
+    # assert resp.json() == PARAMETERS
 
-    resp = client.get(f"/ensembles/{ensemble_id}/parameters")
-    assert resp.json() == ["coeffs"]
 
-    resp = client.get(f"/ensembles/{ensemble_id}/records/coeffs")
-    assert resp.json() == PARAMETERS
-
+    t = ["a", "b", "c"]
     for realization_index in range(NUM_REALIZATIONS):
         client.post(
             f"/ensembles/{ensemble_id}/records/indexed_coeffs/matrix",
             params=dict(realization_index=realization_index),
             data=f"{PARAMETERS[realization_index]}",
         )
+    resp = client.get(f"/ensembles/{ensemble_id}/records")
+    print(resp)
+    # for realization_index in range(NUM_REALIZATIONS):
+    #     resp = client.get(
+    #         f"/ensembles/{ensemble_id}/records/indexed_coeffs",
+    #         params=dict(realization_index=realization_index),
+    #     )
+    #     assert resp.json() == PARAMETERS[realization_index]
 
-    for realization_index in range(NUM_REALIZATIONS):
-        resp = client.get(
-            f"/ensembles/{ensemble_id}/records/indexed_coeffs",
-            params=dict(realization_index=realization_index),
-        )
-        assert resp.json() == PARAMETERS[realization_index]
+    # Fetch as ensemble-wide parameters
+    resp = client.get(f"/ensembles/{ensemble_id}/records/indexed_coeffs")
+    assert resp.json() == PARAMETERS
 
 
 def test_ensemble_wide_parameters(client, simple_ensemble):
@@ -553,3 +560,51 @@ def test_fetch_matrix_ensemble_record_by_realization(client, simple_ensemble):
     )
     real_4 = resp.json()
     assert real_4 == [5.0, 5.0]
+
+
+def test_get_record_labels(client, simple_ensemble):
+    mimetypes = ["application/json", "text/csv", "application/x-parquet"]
+    mimetype = mimetypes[0]
+    ensemble_id = simple_ensemble(size=5)
+    # d = {"a": 42, "b": 41, "c": [[43, 1], [2, 21]]}
+    # d = {"a": [1, 3, 4, 2, 6], "b": [2.1, 2.3, 2.4, 2.2,2.6]}
+    d = [1, 3, 4, 2, 6]
+    post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
+
+    #CSV
+    data_formatted = pd.DataFrame([d]).to_csv().encode()
+
+    # parquet
+    # data = pd.DataFrame([d])
+    # stream = io.BytesIO()
+    # data.to_parquet(stream)
+    # data_formatted = stream.getvalue()
+
+    if mimetype == "application/json":
+        data_formatted = f"{d}"
+
+    client.post(
+        post_url,
+        data=data_formatted,
+        headers={"content-type": mimetype},
+        params=dict(realization_index=1),
+    )
+
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/mat/labels",
+    )
+    print(resp.content)
+
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/mat",
+        params=dict(realization_index=1, label="mat"),
+        headers={"accept": mimetype},
+
+    )
+    stream = io.BytesIO(resp.content)
+
+    if mimetype == "application/x-parquet":
+        df = pd.read_parquet(stream)
+    else:
+        df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+    print(df)

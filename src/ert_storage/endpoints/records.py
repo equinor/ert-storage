@@ -462,6 +462,7 @@ async def get_ensemble_record(
     record: ds.Record = Depends(get_record_by_name),
     accept: str = Header("application/json"),
     realization_index: Optional[int] = None,
+    label: Optional[str] = None,
 ) -> Any:
     """
     Get record with a given `name`. If `realization_index` is not set, look for
@@ -484,7 +485,42 @@ async def get_ensemble_record(
     new_realization_index = (
         realization_index if record.realization_index is None else None
     )
-    return await _get_record_data(bh, record, accept, new_realization_index)
+    return await _get_record_data(bh, record, accept, new_realization_index, label)
+
+
+@router.get("/ensembles/{ensemble_id}/records/{name}/labels", response_model=List[str])
+async def get_record_labels(
+    *, db: Session = Depends(get_db), ensemble_id: UUID,
+    name: str,
+) -> List[str]:
+    """
+    Get the list of record data labels. If the record is not a group record the list of labels will
+    contain only the name of the record
+
+    Example
+    - Group record:
+      data - {"a": 4, "b":42, "c": 2}
+      return: ["a", "b", "c"]
+    - Ensemble record:
+      data - [4, 42, 2, 32]
+      return: []
+    """
+
+    try:
+        record = (
+            db.query(ds.Record)
+            .join(ds.RecordInfo)
+            .filter_by(name=name)
+            .join(ds.Ensemble)
+            .filter_by(id=ensemble_id)
+            .first()
+        )
+    except NoResultFound as e:
+        raise exc.NotFoundError(f"Record not found")
+    labels = record.f64_matrix.labels
+    if labels:
+        return labels[0]
+    return []
 
 
 @router.get("/ensembles/{ensemble_id}/parameters", response_model=List[str])
@@ -556,12 +592,13 @@ def get_ensemble_responses(
 
 
 def _get_dataframe(
-    content: Any, record: ds.Record, realization_index: Optional[int]
+    content: Any, record: ds.Record, realization_index: Optional[int],
+    label: Optional[str]
 ) -> pd.DataFrame:
     data = pd.DataFrame(content)
     labels = record.f64_matrix.labels
     if labels is not None and realization_index is None:
-        data.columns = labels[0]
+        data.columns = labels[0] if label is None else [label]
         data.index = labels[1]
     elif labels is not None and realization_index is not None:
         # The output is such that rows are realizations. Because
@@ -569,7 +606,7 @@ def _get_dataframe(
         # its own row. We transpose the data so that all of the data
         # falls on the same row.
         data = data.T
-        data.columns = labels[0]
+        data.columns = labels[0] if label is None else [label]
         data.index = [realization_index]
     return data
 
@@ -579,11 +616,20 @@ async def _get_record_data(
     record: ds.Record,
     accept: Optional[str],
     realization_index: Optional[int] = None,
+    label: Optional[str] = None,
 ) -> Response:
     type_ = record.record_info.record_type
+    labels = record.f64_matrix.labels[0] if record.f64_matrix.labels else []
+    if label is not None and label not in labels:
+        raise exc.UnprocessableError(f"Record label '{label}' not found!")
+
     if type_ == ds.RecordType.f64_matrix:
         if realization_index is None:
-            content = record.f64_matrix.content
+            if labels:
+                lbl_idx = labels.index(label)
+                content = [[c[lbl_idx]]for c in record.f64_matrix.content]
+            else:
+                content = record.f64_matrix.content
         else:
             content = record.f64_matrix.content[realization_index]
 
@@ -598,14 +644,14 @@ async def _get_record_data(
                 media_type=accept,
             )
         if accept == "text/csv":
-            data = _get_dataframe(content, record, realization_index)
+            data = _get_dataframe(content, record, realization_index, label)
 
             return Response(
                 content=data.to_csv().encode(),
                 media_type=accept,
             )
         if accept == "application/x-parquet":
-            data = _get_dataframe(content, record, realization_index)
+            data = _get_dataframe(content, record, realization_index, label)
             stream = io.BytesIO()
             data.to_parquet(stream)
             return Response(
