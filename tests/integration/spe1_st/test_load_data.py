@@ -87,5 +87,5 @@ def test_read_responses(requests_get, get_ensemble_id):
         ).json()
 
         # test the data size
-        assert len(response_real_0[0]) == 108
-        assert len(response_real_1[0]) == 108
+        assert len(response_real_0) == 108
+        assert len(response_real_1) == 108

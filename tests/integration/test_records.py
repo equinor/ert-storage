@@ -553,3 +553,175 @@ def test_fetch_matrix_ensemble_record_by_realization(client, simple_ensemble):
     )
     real_4 = resp.json()
     assert real_4 == [5.0, 5.0]
+
+
+@pytest.mark.parametrize(
+    "mimetype",
+    ["text/csv", "application/x-parquet"],
+)
+def test_get_record_labels(client, simple_ensemble, mimetype):
+    ensemble_id = simple_ensemble(size=5)
+    # Post labeled data
+    data = {"a": 1, "b": 42, "c": 3}
+    data_formatted = pd.DataFrame([data]).to_csv().encode()
+    client.post(
+        f"/ensembles/{ensemble_id}/records/mat/matrix",
+        data=data_formatted,
+        headers={"content-type": "text/csv"},
+    )
+
+    # Get record data labels
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/mat/labels",
+    )
+    assert resp.json() == ["a", "b", "c"]
+
+
+@pytest.mark.parametrize(
+    "mimetype",
+    ["text/csv", "application/x-parquet"],
+)
+def test_get_labeled_ens_wide_data(client, simple_ensemble, mimetype):
+    ensemble_id = simple_ensemble(size=5)
+    # Post labeled data
+    labels = ["a", "b", "c"]
+
+    data = pd.DataFrame(PARAMETERS)
+    data.columns = labels
+
+    if mimetype == "application/x-parquet":
+        stream = io.BytesIO()
+        data.to_parquet(stream)
+        data_formatted = stream.getvalue()
+    else:
+        data_formatted = data.to_csv()
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/mat/matrix",
+        data=data_formatted,
+        headers={"content-type": mimetype},
+    )
+
+    # Get labeled parameter for index
+    for idx, param in enumerate(PARAMETERS):
+        for l_inx, label in enumerate(labels):
+            resp = client.get(
+                f"/ensembles/{ensemble_id}/records/mat",
+                params=dict(realization_index=idx, label=label),
+                headers={"accept": mimetype},
+            )
+            stream = io.BytesIO(resp.content)
+
+            if mimetype == "application/x-parquet":
+                df = pd.read_parquet(stream)
+            else:
+                df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+            assert df.values[0][0] == param[l_inx]
+
+    # Get ensembl wide labeled parameter
+    for l_inx, label in enumerate(labels):
+        expected = [[p[l_inx]] for p in PARAMETERS]
+        resp = client.get(
+            f"/ensembles/{ensemble_id}/records/mat",
+            params=dict(label=label),
+            headers={"accept": mimetype},
+        )
+        stream = io.BytesIO(resp.content)
+
+        if mimetype == "application/x-parquet":
+            df = pd.read_parquet(stream)
+        else:
+            df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+        assert df.values.tolist() == expected
+        assert [label] == df.columns
+
+
+@pytest.mark.parametrize(
+    "mimetype",
+    ["text/csv", "application/x-parquet"],
+)
+def test_get_labeled_indexed_data(client, simple_ensemble, mimetype):
+    ensemble_id = simple_ensemble(size=5)
+    # Post labeled data
+    labels = ["a", "b", "c"]
+    for idx, param in enumerate(PARAMETERS):
+        data = {k: v for k, v in zip(labels, param)}
+        data_formatted = pd.DataFrame([data]).to_csv().encode()
+        client.post(
+            f"/ensembles/{ensemble_id}/records/indexed_mat/matrix",
+            data=data_formatted,
+            headers={"content-type": "text/csv"},
+            params=dict(realization_index=idx),
+        )
+
+    # Get labeled parameter for index
+    for idx, param in enumerate(PARAMETERS):
+        for l_inx, label in enumerate(labels):
+            resp = client.get(
+                f"/ensembles/{ensemble_id}/records/indexed_mat",
+                params=dict(realization_index=idx, label=label),
+                headers={"accept": mimetype},
+            )
+            stream = io.BytesIO(resp.content)
+
+            if mimetype == "application/x-parquet":
+                df = pd.read_parquet(stream)
+            else:
+                df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+            assert df.values[0][0] == param[l_inx]
+
+    # Get ensembl wide labeled parameter
+    for l_inx, label in enumerate(labels):
+        expected = [[p[l_inx]] for p in PARAMETERS]
+        resp = client.get(
+            f"/ensembles/{ensemble_id}/records/indexed_mat",
+            params=dict(label=label),
+            headers={"accept": mimetype},
+        )
+        stream = io.BytesIO(resp.content)
+
+        if mimetype == "application/x-parquet":
+            df = pd.read_parquet(stream)
+        else:
+            df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+        assert df.values.tolist() == expected
+        assert [label] == df.columns
+
+
+def test_get_file_record_label(
+    client,
+    simple_ensemble,
+):
+    ensemble_id = simple_ensemble()
+
+    # Post a file
+    client.post(
+        f"/ensembles/{ensemble_id}/records/foo/file",
+        params=dict(realization_index=1),
+        files={"file": ("foo.bar", io.BytesIO(), "foo/bar")},
+    )
+
+    # Get ensemble wide record labels
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/foo/labels",
+    )
+    assert resp.json() == []
+
+
+def test_get_ens_wide_record_label(
+    client,
+    simple_ensemble,
+):
+    ensemble_id = simple_ensemble()
+
+    # Post ensemble wide not labeled data
+    client.post(
+        f"/ensembles/{ensemble_id}/records/ens_wide/matrix",
+        json=[[1, 2, 3, 4, 5]],
+    )
+
+    # Get ensemble wide record labels
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/ens_wide/labels",
+    )
+    assert resp.json() == []
