@@ -69,37 +69,30 @@ def test_ensemble_size_out_of_bounds(client, simple_ensemble):
 
 def test_parameters(client, simple_ensemble):
     ensemble_id = simple_ensemble(["coeffs"], size=5)
-    # client.post(
-    #     f"/ensembles/{ensemble_id}/records/coeffs/matrix",
-    #     data=f"{PARAMETERS}",
-    # )
-    #
-    # resp = client.get(f"/ensembles/{ensemble_id}/parameters")
-    # assert resp.json() == ["coeffs"]
-    #
-    # resp = client.get(f"/ensembles/{ensemble_id}/records/coeffs")
-    # assert resp.json() == PARAMETERS
+    client.post(
+        f"/ensembles/{ensemble_id}/records/coeffs/matrix",
+        data=f"{PARAMETERS}",
+    )
 
+    resp = client.get(f"/ensembles/{ensemble_id}/parameters")
+    assert resp.json() == ["coeffs"]
 
-    t = ["a", "b", "c"]
+    resp = client.get(f"/ensembles/{ensemble_id}/records/coeffs")
+    assert resp.json() == PARAMETERS
+
     for realization_index in range(NUM_REALIZATIONS):
         client.post(
             f"/ensembles/{ensemble_id}/records/indexed_coeffs/matrix",
             params=dict(realization_index=realization_index),
             data=f"{PARAMETERS[realization_index]}",
         )
-    resp = client.get(f"/ensembles/{ensemble_id}/records")
-    print(resp)
-    # for realization_index in range(NUM_REALIZATIONS):
-    #     resp = client.get(
-    #         f"/ensembles/{ensemble_id}/records/indexed_coeffs",
-    #         params=dict(realization_index=realization_index),
-    #     )
-    #     assert resp.json() == PARAMETERS[realization_index]
 
-    # Fetch as ensemble-wide parameters
-    resp = client.get(f"/ensembles/{ensemble_id}/records/indexed_coeffs")
-    assert resp.json() == PARAMETERS
+    for realization_index in range(NUM_REALIZATIONS):
+        resp = client.get(
+            f"/ensembles/{ensemble_id}/records/indexed_coeffs",
+            params=dict(realization_index=realization_index),
+        )
+        assert resp.json() == PARAMETERS[realization_index]
 
 
 def test_ensemble_wide_parameters(client, simple_ensemble):
@@ -562,49 +555,96 @@ def test_fetch_matrix_ensemble_record_by_realization(client, simple_ensemble):
     assert real_4 == [5.0, 5.0]
 
 
-def test_get_record_labels(client, simple_ensemble):
-    mimetypes = ["application/json", "text/csv", "application/x-parquet"]
-    mimetype = mimetypes[0]
+@pytest.mark.parametrize(
+    "mimetype",
+    ["text/csv", "application/x-parquet"],
+)
+def test_get_record_labels(client, simple_ensemble, mimetype):
     ensemble_id = simple_ensemble(size=5)
-    # d = {"a": 42, "b": 41, "c": [[43, 1], [2, 21]]}
-    # d = {"a": [1, 3, 4, 2, 6], "b": [2.1, 2.3, 2.4, 2.2,2.6]}
-    d = [1, 3, 4, 2, 6]
-    post_url = f"/ensembles/{ensemble_id}/records/mat/matrix"
-
-    #CSV
-    data_formatted = pd.DataFrame([d]).to_csv().encode()
-
-    # parquet
-    # data = pd.DataFrame([d])
-    # stream = io.BytesIO()
-    # data.to_parquet(stream)
-    # data_formatted = stream.getvalue()
-
-    if mimetype == "application/json":
-        data_formatted = f"{d}"
-
+    # Post labeled data
+    data = {"a": 1, "b": 42, "c": 3}
+    data_formatted = pd.DataFrame([data]).to_csv().encode()
     client.post(
-        post_url,
+        f"/ensembles/{ensemble_id}/records/mat/matrix",
         data=data_formatted,
-        headers={"content-type": mimetype},
-        params=dict(realization_index=1),
+        headers={"content-type": "text/csv"},
     )
 
+    # Get record data labels
     resp = client.get(
         f"/ensembles/{ensemble_id}/records/mat/labels",
     )
-    print(resp.content)
+    assert resp.json() == ["a", "b", "c"]
 
-    resp = client.get(
-        f"/ensembles/{ensemble_id}/records/mat",
-        params=dict(realization_index=1, label="mat"),
-        headers={"accept": mimetype},
 
+@pytest.mark.parametrize(
+    "mimetype",
+    ["text/csv", "application/x-parquet"],
+)
+def test_get_labeled_data(client, simple_ensemble, mimetype):
+    ensemble_id = simple_ensemble(size=5)
+    # Post labeled data
+    labels = ["a", "b", "c"]
+    for idx, param in enumerate(PARAMETERS):
+        data = {k: v for k, v in zip(labels, param)}
+        data_formatted = pd.DataFrame([data]).to_csv().encode()
+        client.post(
+            f"/ensembles/{ensemble_id}/records/mat/matrix",
+            data=data_formatted,
+            headers={"content-type": "text/csv"},
+            params=dict(realization_index=idx),
+        )
+
+    for idx, param in enumerate(PARAMETERS):
+        for l_inx, label in enumerate(labels):
+            resp = client.get(
+                f"/ensembles/{ensemble_id}/records/mat",
+                params=dict(realization_index=idx, label=label),
+                headers={"accept": mimetype},
+            )
+            stream = io.BytesIO(resp.content)
+
+            if mimetype == "application/x-parquet":
+                df = pd.read_parquet(stream)
+            else:
+                df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+            assert df.values[0][0] == param[l_inx]
+
+
+def test_get_file_record_label(
+    client,
+    simple_ensemble,
+):
+    ensemble_id = simple_ensemble()
+
+    # Post a file
+    client.post(
+        f"/ensembles/{ensemble_id}/records/foo/file",
+        params=dict(realization_index=1),
+        files={"file": ("foo.bar", io.BytesIO(), "foo/bar")},
     )
-    stream = io.BytesIO(resp.content)
 
-    if mimetype == "application/x-parquet":
-        df = pd.read_parquet(stream)
-    else:
-        df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
-    print(df)
+    # Get ensemble wide record labels
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/foo/labels",
+    )
+    assert resp.json() == []
+
+
+def test_get_ens_wide_record_label(
+    client,
+    simple_ensemble,
+):
+    ensemble_id = simple_ensemble()
+
+    # Post ensemble wide not labeled data
+    client.post(
+        f"/ensembles/{ensemble_id}/records/ens_wide/matrix",
+        json=[[1, 2, 3, 4, 5]],
+    )
+
+    # Get ensemble wide record labels
+    resp = client.get(
+        f"/ensembles/{ensemble_id}/records/ens_wide/labels",
+    )
+    assert resp.json() == []

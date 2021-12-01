@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4, UUID
 import io
 import numpy as np
@@ -469,6 +470,9 @@ async def get_ensemble_record(
     the ensemble-wide record. If it is set, look first for one created by a
     forward-model for the given realization index and then the ensemble-wide
     record.
+    If label is provided it is assumed the record data if of the form {"a": 1, "b": 2}
+    and will retrun only the data for the provided label (i.e. label = "a" -> return: [[1]])
+
 
     Records support multiple data formats. In particular:
     - Matrix:
@@ -490,7 +494,9 @@ async def get_ensemble_record(
 
 @router.get("/ensembles/{ensemble_id}/records/{name}/labels", response_model=List[str])
 async def get_record_labels(
-    *, db: Session = Depends(get_db), ensemble_id: UUID,
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: UUID,
     name: str,
 ) -> List[str]:
     """
@@ -506,20 +512,19 @@ async def get_record_labels(
       return: []
     """
 
-    try:
-        record = (
-            db.query(ds.Record)
-            .join(ds.RecordInfo)
-            .filter_by(name=name)
-            .join(ds.Ensemble)
-            .filter_by(id=ensemble_id)
-            .first()
-        )
-    except NoResultFound as e:
+    record = (
+        db.query(ds.Record)
+        .join(ds.RecordInfo)
+        .filter_by(name=name)
+        .join(ds.Ensemble)
+        .filter_by(id=ensemble_id)
+        .first()
+    )
+    if record is None:
         raise exc.NotFoundError(f"Record not found")
-    labels = record.f64_matrix.labels
-    if labels:
-        return labels[0]
+
+    if record.f64_matrix and record.f64_matrix.labels:
+        return record.f64_matrix.labels[0]
     return []
 
 
@@ -592,8 +597,10 @@ def get_ensemble_responses(
 
 
 def _get_dataframe(
-    content: Any, record: ds.Record, realization_index: Optional[int],
-    label: Optional[str]
+    content: Any,
+    record: ds.Record,
+    realization_index: Optional[int],
+    label: Optional[str],
 ) -> pd.DataFrame:
     data = pd.DataFrame(content)
     labels = record.f64_matrix.labels
@@ -619,15 +626,14 @@ async def _get_record_data(
     label: Optional[str] = None,
 ) -> Response:
     type_ = record.record_info.record_type
-    labels = record.f64_matrix.labels[0] if record.f64_matrix.labels else []
-    if label is not None and label not in labels:
-        raise exc.UnprocessableError(f"Record label '{label}' not found!")
-
     if type_ == ds.RecordType.f64_matrix:
+        labels = record.f64_matrix.labels[0] if record.f64_matrix.labels else []
+        if label is not None and label not in labels:
+            raise exc.UnprocessableError(f"Record label '{label}' not found!")
         if realization_index is None:
-            if labels:
+            if label is not None:
                 lbl_idx = labels.index(label)
-                content = [[c[lbl_idx]]for c in record.f64_matrix.content]
+                content = [[c[lbl_idx]] for c in record.f64_matrix.content]
             else:
                 content = record.f64_matrix.content
         else:
@@ -659,7 +665,10 @@ async def _get_record_data(
                 media_type=accept,
             )
         else:
-            return content
+            return Response(
+                content=json.dumps(content),
+                media_type="application/json",
+            )
     if type_ == ds.RecordType.file:
         return await bh.get_content(record)
     raise NotImplementedError(
