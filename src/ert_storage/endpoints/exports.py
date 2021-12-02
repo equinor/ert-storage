@@ -1,5 +1,5 @@
 from uuid import uuid4, UUID
-from typing import Dict,List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import Response
@@ -65,7 +65,7 @@ async def get_eclipse_summary_vectors(
     # May be more efficent to do this as part of query
 
     # Keep track of columns so they can be appended
-    column_map: dict[str,DataFrame] = {}
+    column_map: dict[str, DataFrame] = {}
 
     for record in records:
         labels = record.f64_matrix.labels
