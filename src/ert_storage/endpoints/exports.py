@@ -18,19 +18,19 @@ router = APIRouter(tags=["exports"])
     responses={
         status.HTTP_200_OK: {
             "content": {"text/csv": {}},
-            "description": "Exports csv, where...",
+            "description": "Exports emsemble responses as csv",
         }
     },
 )
 async def get_eclipse_summary_vectors(
-        *,
-        db: Session = Depends(get_db),
-        ensemble_id: UUID,
-        frequency: Optional[str] = None,
-        column_list: Optional[List[str]] = Query(None)
-
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: UUID,
+    column_list: Optional[List[str]] = Query(None)
 ) -> Response:
-    # TODO - Preflight checks
+    """
+    Export responses for an ensemble.
+    """
 
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
@@ -45,6 +45,7 @@ async def get_eclipse_summary_vectors(
         filter_group = [ds.RecordInfo.name.like(x.replace("*", "%")
                                                 .replace("?", "_"))
                         for x in column_list]
+
         filter.append(or_(*filter_group))
 
     records = (
@@ -54,21 +55,34 @@ async def get_eclipse_summary_vectors(
         .filter(and_(*filter))
     ).all()
 
+    if len(records) == 0:
+        return Response(content="No data found", status_code=status.HTTP_404_NOT_FOUND)
+
+    # Flatten data into required shape
     # May be more efficent to do this as part of query
-    # TODO deal with frequency 
-    df_list = []
+
+    # Keep track of columns so they can be appended
+    column_map = {}
+
     for record in records:
         labels = record.f64_matrix.labels
-        data={"DATE": labels[0],
-              "REAL": record.realization_index,
-              record.record_info.name:record.f64_matrix.content[0]
+        data = {
+            "REAL": record.realization_index,
+            "DATE": labels[0],
+            record.record_info.name: record.f64_matrix.content[0],
         }
-        data_df = pd.DataFrame(data)
-        df_list.append(data_df.set_index(["DATE", "REAL"])
-                       )
-    # What to return if no columns match??
+        data_frame = pd.DataFrame(data)
+        column_name = record.record_info.name
+        if column_name in column_map:
+            column_map[column_name] = column_map[column_name].append(
+                data_frame, ignore_index=True
+            )
+        else:
+            column_map[column_name] = data_frame
 
+    # Index
+    data_frame_list = [df.set_index(["REAL", "DATE"]) for df in column_map.values()]
     return Response(
-        content=pd.concat(df_list, axis=1, join="outer").to_csv(),
+        content=pd.concat(data_frame_list, axis=1, join="outer").to_csv(index=True),
         media_type="text/csv",
     )
