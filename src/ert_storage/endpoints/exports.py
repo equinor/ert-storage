@@ -65,7 +65,7 @@ async def get_eclipse_summary_vectors(
     # May be more efficent to do this as part of query
 
     # Keep track of columns so they can be appended
-    column_map: dict[str, DataFrame] = {}
+    column_map: Dict[str, DataFrame] = {}
 
     for record in records:
         labels = record.f64_matrix.labels
