@@ -35,16 +35,19 @@ async def get_eclipse_summary_vectors(
     ensemble = db.query(ds.Ensemble).filter_by(id=ensemble_id).one()
 
     # Base record info filter
-    filter =[ds.RecordInfo.ensemble_pk == ensemble.pk,
-             ds.RecordInfo.record_class == ds.RecordClass.response]
+    filter = [
+        ds.RecordInfo.ensemble_pk == ensemble.pk,
+        ds.RecordInfo.record_class == ds.RecordClass.response,
+    ]
 
-    # Add column name filter 
+    # Add column name filter
     if column_list is not None:
         # Maybe only use LIKE when wildcards are actually present
         # And use = for explicit names to make resulting query more efficent
-        filter_group = [ds.RecordInfo.name.like(x.replace("*", "%")
-                                                .replace("?", "_"))
-                        for x in column_list]
+        filter_group = [
+            ds.RecordInfo.name.like(x.replace("*", "%").replace("?", "_"))
+            for x in column_list
+        ]
 
         filter.append(or_(*filter_group))
 
