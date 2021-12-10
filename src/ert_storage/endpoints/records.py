@@ -86,12 +86,35 @@ def get_records_by_name(
 ) -> List[ds.Record]:
     records = (
         db.query(ds.Record)
-        .filter(ds.Record.realization_index != None)
+        .filter_by(realization_index=realization_index)
         .join(ds.RecordInfo)
         .filter_by(name=name)
         .join(ds.Ensemble)
         .filter_by(id=ensemble_id)
     ).all()
+
+    if not records:
+        records = (
+            db.query(ds.Record)
+            .join(ds.RecordInfo)
+            .filter_by(
+                name=name,
+                record_type=ds.RecordType.f64_matrix,
+            )
+            .join(ds.Ensemble)
+            .filter_by(id=ensemble_id)
+        ).all()
+
+    if not records:
+        records = (
+            db.query(ds.Record)
+            .filter_by(realization_index=None)
+            .join(ds.RecordInfo)
+            .filter_by(name=name)
+            .join(ds.Ensemble)
+            .filter_by(id=ensemble_id)
+        ).all()
+
     if not records:
         raise exc.NotFoundError(f"Record not found")
 
@@ -481,7 +504,7 @@ async def get_ensemble_record(
     *,
     db: Session = Depends(get_db),
     bh: BlobHandler = Depends(get_blob_handler),
-    record: ds.Record = Depends(get_record_by_name),
+    records: List[ds.Record] = Depends(get_records_by_name),
     accept: str = Header("application/json"),
     realization_index: Optional[int] = None,
     label: Optional[str] = None,
@@ -507,9 +530,16 @@ async def get_ensemble_record(
         )
         accept = "text/csv"
 
-    if record.record_info.record_type == ds.RecordType.file:
-        return await bh.get_content(record)
-    return await _get_record_data(record, accept, realization_index, label)
+    _type = records[0].record_info.record_type
+    if _type == ds.RecordType.file:
+        return await bh.get_content(records[0])
+
+    df_list = []
+    for record in records:
+        data_df = _get_record_dataframe(record, realization_index, label)
+        df_list.append(data_df)
+
+    return await _get_record_resonse(pd.concat(df_list, axis=0), accept)
 
 
 @router.get("/ensembles/{ensemble_id}/records/{name}/labels", response_model=List[str])
@@ -597,7 +627,8 @@ async def get_record_data(
         bh = get_blob_handler_from_record(db, record)
         return await bh.get_content(record)
 
-    return await _get_record_data(record, accept)
+    dataframe = _get_record_dataframe(record, None, None)
+    return await _get_record_resonse(dataframe, accept)
 
 
 @router.get(
@@ -619,7 +650,7 @@ def get_ensemble_responses(
     }
 
 
-def _get_dataframe(
+def _get_record_dataframe(
     record: ds.Record,
     realization_index: Optional[int],
     label: Optional[str],
@@ -647,53 +678,48 @@ def _get_dataframe(
 
     if labels is not None:
         data.columns = labels[0] if label is None else [label]
-        data.index = labels[1] if realization_index is None else [realization_index]
+        if realization_index is None and record.realization_index is not None:
+            data.index = [record.realization_index]
+        else:
+            data.index = labels[1] if realization_index is None else [realization_index]
     return data
 
 
-async def _get_record_data(
-    record: ds.Record,
+async def _get_record_resonse(
+    dataframe: pd.DataFrame,
     accept: Optional[str],
-    realization_index: Optional[int] = None,
-    label: Optional[str] = None,
 ) -> Response:
-    type_ = record.record_info.record_type
-    if type_ == ds.RecordType.f64_matrix:
-        dataframe = _get_dataframe(record, realization_index, label)
-        if accept == "application/x-numpy":
-            from numpy.lib.format import write_array
+    if accept == "application/x-numpy":
+        from numpy.lib.format import write_array
 
-            stream = io.BytesIO()
-            write_array(stream, np.array(dataframe.values.tolist()))
+        stream = io.BytesIO()
+        write_array(stream, np.array(dataframe.values.tolist()))
 
-            return Response(
-                content=stream.getvalue(),
-                media_type=accept,
-            )
-        if accept == "text/csv":
-            return Response(
-                content=dataframe.to_csv().encode(),
-                media_type=accept,
-            )
-        if accept == "application/x-parquet":
-            stream = io.BytesIO()
-            dataframe.to_parquet(stream)
-            return Response(
-                content=stream.getvalue(),
-                media_type=accept,
-            )
+        return Response(
+            content=stream.getvalue(),
+            media_type=accept,
+        )
+    if accept == "text/csv":
+        return Response(
+            content=dataframe.to_csv().encode(),
+            media_type=accept,
+        )
+    if accept == "application/x-parquet":
+        stream = io.BytesIO()
+        dataframe.to_parquet(stream)
+        return Response(
+            content=stream.getvalue(),
+            media_type=accept,
+        )
+    else:
+        if dataframe.values.shape[0] == 1:
+            content = dataframe.values[0].tolist()
         else:
-            if dataframe.values.shape[0] == 1:
-                content = dataframe.values[0].tolist()
-            else:
-                content = dataframe.values.tolist()
-            return Response(
-                content=json.dumps(content),
-                media_type="application/json",
-            )
-    raise NotImplementedError(
-        f"Getting record data for type {type_} and Accept header {accept} not implemented"
-    )
+            content = dataframe.values.tolist()
+        return Response(
+            content=json.dumps(content),
+            media_type="application/json",
+        )
 
 
 def _create_record(

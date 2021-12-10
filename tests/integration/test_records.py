@@ -581,20 +581,28 @@ def test_get_record_labels(client, simple_ensemble, mimetype):
     "mimetype",
     ["text/csv", "application/x-parquet"],
 )
-def test_get_labeled_data(client, simple_ensemble, mimetype):
+def test_get_labeled_ens_wide_data(client, simple_ensemble, mimetype):
     ensemble_id = simple_ensemble(size=5)
     # Post labeled data
     labels = ["a", "b", "c"]
-    for idx, param in enumerate(PARAMETERS):
-        data = {k: v for k, v in zip(labels, param)}
-        data_formatted = pd.DataFrame([data]).to_csv().encode()
-        client.post(
-            f"/ensembles/{ensemble_id}/records/mat/matrix",
-            data=data_formatted,
-            headers={"content-type": "text/csv"},
-            params=dict(realization_index=idx),
-        )
 
+    data = pd.DataFrame(PARAMETERS)
+    data.columns = labels
+
+    if mimetype == "application/x-parquet":
+        stream = io.BytesIO()
+        data.to_parquet(stream)
+        data_formatted = stream.getvalue()
+    else:
+        data_formatted = data.to_csv()
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/mat/matrix",
+        data=data_formatted,
+        headers={"content-type": mimetype},
+    )
+
+    # Get labeled parameter for index
     for idx, param in enumerate(PARAMETERS):
         for l_inx, label in enumerate(labels):
             resp = client.get(
@@ -609,6 +617,75 @@ def test_get_labeled_data(client, simple_ensemble, mimetype):
             else:
                 df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
             assert df.values[0][0] == param[l_inx]
+
+    # Get ensembl wide labeled parameter
+    for l_inx, label in enumerate(labels):
+        expected = [[p[l_inx]] for p in PARAMETERS]
+        resp = client.get(
+            f"/ensembles/{ensemble_id}/records/mat",
+            params=dict(label=label),
+            headers={"accept": mimetype},
+        )
+        stream = io.BytesIO(resp.content)
+
+        if mimetype == "application/x-parquet":
+            df = pd.read_parquet(stream)
+        else:
+            df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+        assert df.values.tolist() == expected
+        assert [label] == df.columns
+
+
+@pytest.mark.parametrize(
+    "mimetype",
+    ["text/csv", "application/x-parquet"],
+)
+def test_get_labeled_indexed_data(client, simple_ensemble, mimetype):
+    ensemble_id = simple_ensemble(size=5)
+    # Post labeled data
+    labels = ["a", "b", "c"]
+    for idx, param in enumerate(PARAMETERS):
+        data = {k: v for k, v in zip(labels, param)}
+        data_formatted = pd.DataFrame([data]).to_csv().encode()
+        client.post(
+            f"/ensembles/{ensemble_id}/records/indexed_mat/matrix",
+            data=data_formatted,
+            headers={"content-type": "text/csv"},
+            params=dict(realization_index=idx),
+        )
+
+    # Get labeled parameter for index
+    for idx, param in enumerate(PARAMETERS):
+        for l_inx, label in enumerate(labels):
+            resp = client.get(
+                f"/ensembles/{ensemble_id}/records/indexed_mat",
+                params=dict(realization_index=idx, label=label),
+                headers={"accept": mimetype},
+            )
+            stream = io.BytesIO(resp.content)
+
+            if mimetype == "application/x-parquet":
+                df = pd.read_parquet(stream)
+            else:
+                df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+            assert df.values[0][0] == param[l_inx]
+
+    # Get ensembl wide labeled parameter
+    for l_inx, label in enumerate(labels):
+        expected = [[p[l_inx]] for p in PARAMETERS]
+        resp = client.get(
+            f"/ensembles/{ensemble_id}/records/indexed_mat",
+            params=dict(label=label),
+            headers={"accept": mimetype},
+        )
+        stream = io.BytesIO(resp.content)
+
+        if mimetype == "application/x-parquet":
+            df = pd.read_parquet(stream)
+        else:
+            df = pd.read_csv(stream, index_col=0, float_precision="round_trip")
+        assert df.values.tolist() == expected
+        assert [label] == df.columns
 
 
 def test_get_file_record_label(
