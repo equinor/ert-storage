@@ -77,6 +77,27 @@ def get_record_by_name(
     raise exc.NotFoundError(f"Record not found")
 
 
+def get_records_by_name(
+    *,
+    db: Session = Depends(get_db),
+    ensemble_id: UUID,
+    name: str,
+    realization_index: Optional[int] = None,
+) -> List[ds.Record]:
+    records = (
+        db.query(ds.Record)
+        .filter(ds.Record.realization_index != None)
+        .join(ds.RecordInfo)
+        .filter_by(name=name)
+        .join(ds.Ensemble)
+        .filter_by(id=ensemble_id)
+    ).all()
+    if not records:
+        raise exc.NotFoundError(f"Record not found")
+
+    return records
+
+
 def new_record(
     *,
     db: Session = Depends(get_db),
@@ -471,7 +492,7 @@ async def get_ensemble_record(
     forward-model for the given realization index and then the ensemble-wide
     record.
     If label is provided it is assumed the record data if of the form {"a": 1, "b": 2}
-    and will retrun only the data for the provided label (i.e. label = "a" -> return: [[1]])
+    and will retun only the data for the provided label (i.e. label = "a" -> return: [[1]])
 
 
     Records support multiple data formats. In particular:
@@ -486,10 +507,9 @@ async def get_ensemble_record(
         )
         accept = "text/csv"
 
-    new_realization_index = (
-        realization_index if record.realization_index is None else None
-    )
-    return await _get_record_data(bh, record, accept, new_realization_index, label)
+    if record.record_info.record_type == ds.RecordType.file:
+        return await bh.get_content(record)
+    return await _get_record_data(record, accept, realization_index, label)
 
 
 @router.get("/ensembles/{ensemble_id}/records/{name}/labels", response_model=List[str])
@@ -573,8 +593,11 @@ async def get_record_data(
         accept = "text/csv"
 
     record = db.query(ds.Record).filter_by(id=record_id).one()
-    bh = get_blob_handler_from_record(db, record)
-    return await _get_record_data(bh, record, accept)
+    if record.record_info.record_type == ds.RecordType.file:
+        bh = get_blob_handler_from_record(db, record)
+        return await bh.get_content(record)
+
+    return await _get_record_data(record, accept)
 
 
 @router.get(
@@ -597,29 +620,38 @@ def get_ensemble_responses(
 
 
 def _get_dataframe(
-    content: Any,
     record: ds.Record,
     realization_index: Optional[int],
     label: Optional[str],
 ) -> pd.DataFrame:
-    data = pd.DataFrame(content)
+    type_ = record.record_info.record_type
+    if type_ != ds.RecordType.f64_matrix:
+        raise exc.ExpectationError("Non matrix record not supported")
+
     labels = record.f64_matrix.labels
-    if labels is not None and realization_index is None:
+    if labels is not None and label is not None and label not in labels[0]:
+        raise exc.UnprocessableError(f"Record label '{label}' not found!")
+
+    if realization_index is None or record.realization_index is not None:
+        matrix_content = record.f64_matrix.content
+    elif record.realization_index is None:
+        matrix_content = record.f64_matrix.content[realization_index]
+    if not isinstance(matrix_content[0], List):
+        matrix_content = [matrix_content]
+
+    if labels is not None and label is not None:
+        lbl_idx = labels[0].index(label)
+        data = pd.DataFrame([[c[lbl_idx]] for c in matrix_content])
+    else:
+        data = pd.DataFrame(matrix_content)
+
+    if labels is not None:
         data.columns = labels[0] if label is None else [label]
-        data.index = labels[1]
-    elif labels is not None and realization_index is not None:
-        # The output is such that rows are realizations. Because
-        # `content` is a 1d list in this case, it treats each element as
-        # its own row. We transpose the data so that all of the data
-        # falls on the same row.
-        data = data.T
-        data.columns = labels[0] if label is None else [label]
-        data.index = [realization_index]
+        data.index = labels[1] if realization_index is None else [realization_index]
     return data
 
 
 async def _get_record_data(
-    bh: BlobHandler,
     record: ds.Record,
     accept: Optional[str],
     realization_index: Optional[int] = None,
@@ -627,50 +659,38 @@ async def _get_record_data(
 ) -> Response:
     type_ = record.record_info.record_type
     if type_ == ds.RecordType.f64_matrix:
-        labels = record.f64_matrix.labels[0] if record.f64_matrix.labels else []
-        if label is not None and label not in labels:
-            raise exc.UnprocessableError(f"Record label '{label}' not found!")
-        if realization_index is None:
-            if label is not None:
-                lbl_idx = labels.index(label)
-                content = [[c[lbl_idx]] for c in record.f64_matrix.content]
-            else:
-                content = record.f64_matrix.content
-        else:
-            content = record.f64_matrix.content[realization_index]
-
+        dataframe = _get_dataframe(record, realization_index, label)
         if accept == "application/x-numpy":
             from numpy.lib.format import write_array
 
             stream = io.BytesIO()
-            write_array(stream, np.array(content))
+            write_array(stream, np.array(dataframe.values.tolist()))
 
             return Response(
                 content=stream.getvalue(),
                 media_type=accept,
             )
         if accept == "text/csv":
-            data = _get_dataframe(content, record, realization_index, label)
-
             return Response(
-                content=data.to_csv().encode(),
+                content=dataframe.to_csv().encode(),
                 media_type=accept,
             )
         if accept == "application/x-parquet":
-            data = _get_dataframe(content, record, realization_index, label)
             stream = io.BytesIO()
-            data.to_parquet(stream)
+            dataframe.to_parquet(stream)
             return Response(
                 content=stream.getvalue(),
                 media_type=accept,
             )
         else:
+            if dataframe.values.shape[0] == 1:
+                content = dataframe.values[0].tolist()
+            else:
+                content = dataframe.values.tolist()
             return Response(
                 content=json.dumps(content),
                 media_type="application/json",
             )
-    if type_ == ds.RecordType.file:
-        return await bh.get_content(record)
     raise NotImplementedError(
         f"Getting record data for type {type_} and Accept header {accept} not implemented"
     )
