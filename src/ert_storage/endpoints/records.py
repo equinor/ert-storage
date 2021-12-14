@@ -539,7 +539,12 @@ async def get_ensemble_record(
         data_df = _get_record_dataframe(record, realization_index, label)
         df_list.append(data_df)
 
-    return await _get_record_resonse(pd.concat(df_list, axis=0), accept)
+    # Combine data for each realization into one dataframe
+    data_frame = pd.concat(df_list, axis=0)
+    # Sort data by realization number
+    data_frame.sort_index(axis=0, inplace=True)
+
+    return await _get_record_resonse(data_frame, accept)
 
 
 @router.get("/ensembles/{ensemble_id}/records/{name}/labels", response_model=List[str])
