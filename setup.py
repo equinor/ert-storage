@@ -38,6 +38,7 @@ setup(
         "test": [
             "black",
             "pytest",
+            "pytest-asyncio",
             "mypy",
             "types-requests",
         ],
@@ -56,6 +57,7 @@ setup(
         "fastapi",
         "graphene<3.0.0",
         "graphene-sqlalchemy>=2.0",
+        "httpx",
         "numpy",
         "pandas",
         "pyarrow",
