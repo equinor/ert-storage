@@ -54,7 +54,7 @@ setup(
         "alembic",
         "async-exit-stack; python_version < '3.7'",
         "async-generator; python_version < '3.7'",
-        "fastapi",
+        "fastapi==0.70.1",
         "graphene<3.0.0",
         "graphene-sqlalchemy>=2.0",
         "httpx",
