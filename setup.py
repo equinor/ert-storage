@@ -65,6 +65,7 @@ setup(
         "python-multipart",
         "requests",
         "sqlalchemy>=1.4",
-        "uvicorn",
+        "uvicorn < 0.17.0; python_version <= '3.6'",
+        "uvicorn >= 0.17.0; python_version > '3.6'",
     ],
 )
