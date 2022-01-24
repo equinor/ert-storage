@@ -7,6 +7,7 @@ query($id: ID!) {
   ensemble(id: $id) {
     uniqueResponses {
       name
+      recordType
     }
   }
 }
@@ -73,6 +74,7 @@ def test_get_gql_response(client, create_experiment, create_ensemble):
     r = client.gql_execute(GET_UNIQUE_RESPONSES, variable_values={"id": ensemble_id})
     for response in r["data"]["ensemble"]["uniqueResponses"]:
         assert response["name"] in RESPONSE_NAMES
+        assert response["recordType"] == "F64_MATRIX"
 
     # retrieve all responses and realizations
     r = client.gql_execute(GET_ALL_RESPONSES, variable_values={"id": ensemble_id})
