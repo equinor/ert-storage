@@ -18,7 +18,7 @@ start_tests () {
     then
         exit $test_result
     fi
-    pytest -vs -k "not test_typing and not spe1"
+    pytest -vs -k "not spe1"
 }
 
 run_spe1_tests() {
