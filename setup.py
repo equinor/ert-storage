@@ -36,7 +36,7 @@ setup(
     },
     extras_require={
         "test": [
-            "black",
+            "black==21.12b0",
             "pytest",
             "pytest-asyncio",
             "mypy",
