@@ -4,6 +4,9 @@ from subprocess import run
 
 
 def test_formatting():
+    if sys.version_info < (3, 8):
+        return
+
     proc = run(
         [
             sys.executable,
