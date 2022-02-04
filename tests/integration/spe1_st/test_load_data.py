@@ -27,13 +27,15 @@ def test_read_parameters(requests_get, get_ensemble_id):
     parameters = requests_get(f"ensembles/{ens_id}/parameters").json()
 
     # test for parameters
-    assert {"FIELD_PROPERTIES:POROSITY", "FIELD_PROPERTIES:X_MID_PERMEABILITY"} == set(
-        parameters
-    )
+    expected_parameters = [
+        {"name": "FIELD_PROPERTIES:POROSITY", "labels": ["0"]},
+        {"name": "FIELD_PROPERTIES:X_MID_PERMEABILITY", "labels": ["0"]},
+    ]
+    assert expected_parameters == parameters
 
     # test for parameter shape
-    param1 = requests_get(f"ensembles/{ens_id}/records/{parameters[0]}").json()
-    param2 = requests_get(f"ensembles/{ens_id}/records/{parameters[1]}").json()
+    param1 = requests_get(f"ensembles/{ens_id}/records/{parameters[0]['name']}").json()
+    param2 = requests_get(f"ensembles/{ens_id}/records/{parameters[1]['name']}").json()
 
     assert len(param1) == 2
     assert len(param2) == 2

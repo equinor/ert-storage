@@ -75,7 +75,7 @@ def test_parameters(client, simple_ensemble):
     )
 
     resp = client.get(f"/ensembles/{ensemble_id}/parameters")
-    assert resp.json() == ["coeffs"]
+    assert resp.json() == [{"labels": [], "name": "coeffs"}]
 
     resp = client.get(f"/ensembles/{ensemble_id}/records/coeffs")
     assert resp.json() == PARAMETERS
@@ -560,14 +560,21 @@ def test_fetch_matrix_ensemble_record_by_realization(client, simple_ensemble):
     ["text/csv", "application/x-parquet"],
 )
 def test_get_record_labels(client, simple_ensemble, mimetype):
-    ensemble_id = simple_ensemble(size=5)
+    ensemble_id = simple_ensemble(parameters=["mat"], size=5)
     # Post labeled data
     data = {"a": 1, "b": 42, "c": 3}
-    data_formatted = pd.DataFrame([data]).to_csv().encode()
+    dataframe = pd.DataFrame([data])
+    if mimetype == "text/csv":
+        data_formatted = dataframe.to_csv().encode()
+    else:
+        stream = io.BytesIO()
+        dataframe.to_parquet(stream)
+        data_formatted = stream.getvalue()
+
     client.post(
         f"/ensembles/{ensemble_id}/records/mat/matrix",
         data=data_formatted,
-        headers={"content-type": "text/csv"},
+        headers={"content-type": mimetype},
     )
 
     # Get record data labels
@@ -581,8 +588,46 @@ def test_get_record_labels(client, simple_ensemble, mimetype):
     "mimetype",
     ["text/csv", "application/x-parquet"],
 )
+def test_get_parameters_with_labels(client, simple_ensemble, mimetype):
+    expected_params = ["with_labels", "no_labels"]
+    ensemble_id = simple_ensemble(parameters=expected_params, size=5)
+    # Post labeled data
+    data = {"a": 1, "b": 42, "c": 3}
+    dataframe = pd.DataFrame([data])
+    if mimetype == "text/csv":
+        data_formatted = dataframe.to_csv().encode()
+    else:
+        stream = io.BytesIO()
+        dataframe.to_parquet(stream)
+        data_formatted = stream.getvalue()
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/with_labels/matrix",
+        data=data_formatted,
+        headers={"content-type": mimetype},
+    )
+
+    client.post(
+        f"/ensembles/{ensemble_id}/records/no_labels/matrix",
+        data="[[4, 3, 2, 1]]",
+    )
+
+    parameters = client.get(
+        f"/ensembles/{ensemble_id}/parameters",
+    ).json()
+    parameter_names = [param["name"] for param in parameters]
+    parameter_labels = [param["labels"] for param in parameters]
+
+    assert parameter_names == expected_params
+    assert parameter_labels == [["a", "b", "c"], []]
+
+
+@pytest.mark.parametrize(
+    "mimetype",
+    ["text/csv", "application/x-parquet"],
+)
 def test_get_labeled_ens_wide_data(client, simple_ensemble, mimetype):
-    ensemble_id = simple_ensemble(size=5)
+    ensemble_id = simple_ensemble(parameters=["mat"], size=5)
     # Post labeled data
     labels = ["a", "b", "c"]
 
