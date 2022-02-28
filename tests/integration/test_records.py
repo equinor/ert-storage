@@ -406,7 +406,7 @@ def test_ensemble_file(client, simple_ensemble):
     ensemble_id = simple_ensemble()
 
     with open("/dev/urandom", "rb") as f:
-        data = f.read(random.randint(2 ** 16, 2 ** 24))
+        data = f.read(random.randint(2**16, 2**24))
     client.post(
         f"/ensembles/{ensemble_id}/records/foo/file",
         files={"file": ("somefile", io.BytesIO(data), "foo/!@#$%^&*")},
@@ -420,8 +420,8 @@ def test_forward_model_file(client, simple_ensemble):
     ensemble_id = simple_ensemble(size=5)
 
     with open("/dev/urandom", "rb") as f:
-        data_a = f.read(random.randint(2 ** 16, 2 ** 24))
-        data_b = f.read(random.randint(2 ** 16, 2 ** 24))
+        data_a = f.read(random.randint(2**16, 2**24))
+        data_b = f.read(random.randint(2**16, 2**24))
     index_a, index_b = random.sample(range(NUM_REALIZATIONS), 2)
 
     client.post(
@@ -454,8 +454,8 @@ def test_chunked_blob(client, simple_ensemble):
 
     ensemble_id = simple_ensemble()
 
-    size = 12 * 1024 ** 2
-    block_size = 4 * 1024 ** 2
+    size = 12 * 1024**2
+    block_size = 4 * 1024**2
 
     def _generate_blob_chunks():
         data = []

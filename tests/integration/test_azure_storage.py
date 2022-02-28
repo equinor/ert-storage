@@ -50,8 +50,8 @@ def test_blocked_blob(client, azure_client, simple_ensemble):
 
     ensemble_id = simple_ensemble()
 
-    size = 12 * 1024 ** 2
-    block_size = 4 * 1024 ** 2
+    size = 12 * 1024**2
+    block_size = 4 * 1024**2
 
     def _generate_blob_chunks():
         data = []
