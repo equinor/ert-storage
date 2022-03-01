@@ -1,5 +1,5 @@
 from uuid import UUID
-from typing import Any, Mapping, List, Optional
+from typing import Any, Mapping, Optional
 from pydantic import BaseModel, Field
 
 
