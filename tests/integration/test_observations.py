@@ -72,6 +72,7 @@ def test_observations_with_records(client, create_experiment, create_ensemble):
     for obs in uploaded_observations:
         record_id = obs["records"][0]
         rec_obj = client.get(f"/records/{record_id}").json()
+        assert rec_obj["has_observations"] is True
         assert record_obs_association[obs["name"]] == rec_obj["name"]
 
 
@@ -125,8 +126,24 @@ def test_records_with_observations(client, create_experiment, create_ensemble):
 
         rec_obj = client.get(f"/records/{record_id}").json()
         assert record_obs_association[obs["name"]] == rec_obj["name"]
+        assert rec_obj["has_observations"] is True
 
         obs_from_record = client.get(
             f"/ensembles/{ensemble_id}/records/{rec_obj['name']}/observations",
         ).json()
         assert obs == obs_from_record[0]
+
+
+def test_records_without_observations(client, create_experiment, create_ensemble):
+    experiment_id = create_experiment("test_ensembles")
+    ensemble_id = create_ensemble(experiment_id=experiment_id)
+
+    record_name = "FOPR"
+    record_obj = client.post(
+        f"/ensembles/{ensemble_id}/records/{record_name}/matrix", json=[1.1, 2.1, 3.1]
+    ).json()
+
+    assert record_obj["has_observations"] is False
+
+    ensemble_records = client.get(f"/ensembles/{ensemble_id}/records").json()
+    assert ensemble_records[record_name]["has_observations"] is False
