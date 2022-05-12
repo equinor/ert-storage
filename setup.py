@@ -36,7 +36,7 @@ setup(
     },
     extras_require={
         "test": [
-            "black==22.1.0; python_version > '3.6'",
+            "black",
             "pytest",
             "pytest-asyncio",
             "mypy",
