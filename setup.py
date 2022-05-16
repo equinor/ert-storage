@@ -1,9 +1,14 @@
 from setuptools import setup
 
+with open("README.md") as f:
+    long_description = f.read()
+
 
 setup(
     name="ert-storage",
     description="Storage service for ERT",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author="Equinor ASA",
     author_email="fg_sib-scout@equinor.com",
     url="https://github.com/equinor/ert-storage",
