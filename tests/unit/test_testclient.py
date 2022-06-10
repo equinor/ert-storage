@@ -24,15 +24,9 @@ class MockHTTPClient:
         return MockResponse()
 
 
-class MockGraphQLClient:
-    def execute(self, *args, **kwargs):
-        return {"errors": []}
-
-
 class TestClient(testclient._TestClient):
     def __init__(self):
         self.http_client = MockHTTPClient()
-        self.gql_client = MockGraphQLClient()
 
 
 @pytest.mark.parametrize("should_raise", [False, True])
@@ -48,21 +42,6 @@ def test_rest(should_raise):
                 http_func("/testpath")
         else:
             assert http_func("/testpath").status_code == 404
-
-
-@pytest.mark.parametrize("should_raise", [False, True])
-def test_gql(should_raise):
-    query = "{ thisIsASyntacticallyValidGraphQLQuery }"
-    tc = TestClient()
-    tc.raise_on_client_error = should_raise
-
-    if should_raise:
-        with pytest.raises(
-            testclient.ClientError, match="GraphQL query returned an error"
-        ):
-            tc.gql_execute(query)
-    else:
-        assert "errors" in tc.gql_execute(query)
 
 
 def test_environ(monkeypatch):
