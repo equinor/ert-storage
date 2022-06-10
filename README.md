@@ -3,7 +3,7 @@ ERT Storage Server
 
 This is the permanent storage solution for the
 [ERT](https://github.com/equinor/ert) project. It is written in Python 3.6+
-using FastAPI, Pydantic, SQLAlchemy, Graphene and Azure Blob Storage.
+using FastAPI, Pydantic, SQLAlchemy and Azure Blob Storage.
 
 # Development Environment
 
@@ -30,7 +30,6 @@ Then start ERT Storage simply by using the new `ert-storage` command. This comma
 
 - http://localhost:8000/doc Swagger
 - http://localhost:8000/redoc ReDoc (alternative to Swagger)
-- http://localhost:8000/gql Graph_i_QL, interactive GraphQL page
 
 # Persisting data
 
