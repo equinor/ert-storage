@@ -56,9 +56,7 @@ setup(
     },
     install_requires=[
         "alembic",
-        "async-exit-stack; python_version < '3.7'",
-        "async-generator; python_version < '3.7'",
-        "fastapi==0.70.1",
+        "fastapi",
         "httpx",
         "numpy",
         "pandas",
@@ -67,7 +65,6 @@ setup(
         "python-multipart",
         "requests",
         "sqlalchemy>=1.4",
-        "uvicorn < 0.17.0; python_version <= '3.6'",
-        "uvicorn >= 0.17.0; python_version > '3.6'",
+        "uvicorn >= 0.17.0",
     ],
 )
