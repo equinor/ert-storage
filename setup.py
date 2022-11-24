@@ -43,7 +43,7 @@ setup(
             "black",
             "pytest",
             "pytest-asyncio",
-            "mypy",
+            "mypy==0.981",
             "types-requests",
         ],
         "postgres": [
