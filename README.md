@@ -1,5 +1,9 @@
-ERT Storage Server
-====================================================
+# ERT Storage Server
+
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ert-storage)](https://img.shields.io/pypi/pyversions/ert-storage)
+[![Downloads](https://pepy.tech/badge/ert-storage)](https://pepy.tech/project/ert-storage)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/equinor/ert-storage)](https://img.shields.io/github/commit-activity/m/equinor/ert-storage)
+[![GitHub contributors](https://img.shields.io/github/contributors-anon/equinor/ert-storage)](https://img.shields.io/github/contributors-anon/equinor/ert-storage)
 
 This is the permanent storage solution for the
 [ERT](https://github.com/equinor/ert) project. It is written in Python 3.6+
