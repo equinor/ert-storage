@@ -450,6 +450,7 @@ def test_forward_model_file(client, simple_ensemble):
             assert resp.status_code == 404
 
 
+@pytest.mark.skip(reason="github.com/equinor/ert-storage/issues/234")
 def test_chunked_blob(client, simple_ensemble):
 
     ensemble_id = simple_ensemble()
