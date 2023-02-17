@@ -452,7 +452,6 @@ def test_forward_model_file(client, simple_ensemble):
 
 @pytest.mark.skip(reason="github.com/equinor/ert-storage/issues/234")
 def test_chunked_blob(client, simple_ensemble):
-
     ensemble_id = simple_ensemble()
 
     size = 12 * 1024**2
