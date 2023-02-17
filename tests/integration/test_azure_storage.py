@@ -47,7 +47,6 @@ def test_blob(client, azure_client, simple_ensemble):
 
 
 def test_blocked_blob(client, azure_client, simple_ensemble):
-
     ensemble_id = simple_ensemble()
 
     size = 12 * 1024**2
