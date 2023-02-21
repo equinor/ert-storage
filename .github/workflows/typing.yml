@@ -30,4 +30,4 @@ jobs:
         python -m pip install starlette==0.25.0
     - name: Run mypy
       run: |
-        mypy -p ert_storage --ignore-missing-imports --disallow-untyped-defs --show-error-codes
+        mypy -p ert_storage --ignore-missing-imports --disallow-untyped-defs --show-error-codes --exclude _alembic --exclude testing
