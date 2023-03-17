@@ -4,9 +4,9 @@ import pytest
 
 @pytest.fixture(scope="session")
 def get_info():
-    from ert.services import StorageService
+    from ert.services import StorageClient
 
-    with StorageService.start_server() as service:
+    with StorageClient.start_server() as service:
         yield service.fetch_url(), service.fetch_auth()[1]
 
 
