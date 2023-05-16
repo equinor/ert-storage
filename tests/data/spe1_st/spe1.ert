@@ -1,7 +1,7 @@
 QUEUE_SYSTEM LOCAL
 QUEUE_OPTION LOCAL MAX_RUNNING 50
 
-RUNPATH spe1_out/realization-%d/iter-%d
+RUNPATH spe1_out/realization-<IENS>/iter-<ITER>
 
 NUM_REALIZATIONS 2
 
