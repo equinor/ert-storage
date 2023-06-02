@@ -1,6 +1,7 @@
 import os
 from typing import Any
 
+import sqlalchemy.orm.Session as sqlalchemy_session
 from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.exc import DBAPIError
@@ -31,8 +32,10 @@ if IS_SQLITE:
     engine = create_engine(URI_RDBMS, connect_args={"check_same_thread": False})
 else:
     engine = create_engine(URI_RDBMS, pool_size=50, max_overflow=100)
-Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+Session: sqlalchemy_session = sessionmaker(
+    autocommit=False, autoflush=False, bind=engine
+)
 
 Base = declarative_base()
 
