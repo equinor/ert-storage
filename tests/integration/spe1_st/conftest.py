@@ -1,10 +1,13 @@
-import requests
 import pytest
+import requests
 
 
 @pytest.fixture(scope="session")
 def get_info():
-    from ert.services import Storage
+    try:
+        from ert.services import StorageService as Storage
+    except ImportError:
+        from ert.services import Storage
 
     with Storage.start_server() as service:
         yield service.fetch_url(), service.fetch_auth()[1]

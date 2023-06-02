@@ -1,13 +1,13 @@
 import io
+import itertools
 import json
 import random
-import itertools
+
 import numpy as np
 import pandas as pd
 import pytest
 from fastapi import status
 from numpy.testing import assert_array_equal
-
 
 NUM_REALIZATIONS = 5
 PARAMETERS = [
@@ -258,7 +258,7 @@ def test_missing_record_exception(client, simple_ensemble):
     "get,post", list(itertools.product(["json", "numpy"], repeat=2))
 )
 def test_ensemble_matrix_json(client, simple_ensemble, get, post):
-    from numpy.lib.format import write_array, read_array
+    from numpy.lib.format import read_array, write_array
 
     ensemble_id = simple_ensemble()
 
@@ -450,8 +450,8 @@ def test_forward_model_file(client, simple_ensemble):
             assert resp.status_code == 404
 
 
+@pytest.mark.skip(reason="github.com/equinor/ert-storage/issues/234")
 def test_chunked_blob(client, simple_ensemble):
-
     ensemble_id = simple_ensemble()
 
     size = 12 * 1024**2

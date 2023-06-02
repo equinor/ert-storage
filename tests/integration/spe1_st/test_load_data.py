@@ -2,12 +2,14 @@ import pytest
 
 
 @pytest.mark.spe1
+@pytest.mark.xfail(reason="Fails because ert>5 no longer supports ert-storage")
 def test_read_experiments(requests_get):
     experiments = requests_get("experiments").json()
     assert len(experiments) == 1
 
 
 @pytest.mark.spe1
+@pytest.mark.xfail(reason="Fails because ert>5 no longer supports ert-storage")
 def test_read_priors(get_experiment_dict):
     exp = get_experiment_dict
     prior = {"function": "uniform", "min": 0.1, "max": 0.9}
@@ -20,6 +22,7 @@ def test_read_priors(get_experiment_dict):
 
 
 @pytest.mark.spe1
+@pytest.mark.xfail(reason="Fails because ert>5 no longer supports ert-storage")
 def test_read_parameters(requests_get, get_ensemble_id):
     ens_id = get_ensemble_id
 
@@ -42,6 +45,7 @@ def test_read_parameters(requests_get, get_ensemble_id):
 
 
 @pytest.mark.spe1
+@pytest.mark.xfail(reason="Fails because ert>5 no longer supports ert-storage")
 def test_read_observations(requests_get, get_ensemble_id):
     ens_id = get_ensemble_id
 
@@ -69,6 +73,7 @@ def test_read_observations(requests_get, get_ensemble_id):
 
 
 @pytest.mark.spe1
+@pytest.mark.xfail(reason="Fails because ert>5 no longer supports ert-storage")
 def test_read_responses(requests_get, get_ensemble_id):
     ens_id = get_ensemble_id
 

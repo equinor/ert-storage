@@ -56,7 +56,7 @@ setup(
     },
     install_requires=[
         "alembic",
-        "fastapi<0.89",
+        "fastapi",
         "httpx",
         "numpy",
         "pandas",
