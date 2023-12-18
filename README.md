@@ -9,6 +9,9 @@ This is the permanent storage solution for the
 [ERT](https://github.com/equinor/ert) project. It is written in Python 3.6+
 using FastAPI, Pydantic, SQLAlchemy and Azure Blob Storage.
 
+> [!CAUTION]
+> This repository has been archived as its contents have been merged with ERT proper. 
+
 # Development Environment
 
 This section describes how to use ERT Storage for testing or development purposes. It uses an in-memory SQLite database with no Azure Blob Storage.
